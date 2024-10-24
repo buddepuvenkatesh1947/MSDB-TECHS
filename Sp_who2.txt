@@ -1,0 +1,34 @@
+First Method:
+CREATE TABLE #sp_who2 (SPID INT,Status VARCHAR(255),
+      Login  VARCHAR(255),HostName  VARCHAR(255),
+      BlkBy  VARCHAR(255),DBName  VARCHAR(255),
+      Command VARCHAR(255),CPUTime INT,
+      DiskIO INT,LastBatch VARCHAR(255),
+      ProgramName VARCHAR(255),SPID2 INT,
+      REQUESTID INT)
+Insert into #sp_who2 EXEC sp_who2
+--Filter the results
+Select * FROM #sp_who2 ---- filter the results by using where condition.
+
+Truncate table #sp_who2 --Note:Truncate the table everytime to load current result set.
+select * from #sp_who2 where spid >55 and Status = 'sleeping' and Login = 'LENOVO\test' --use as per your requirement
+
+
+
+
+
+Second method:
+
+Declare @tempTable table (
+SPID INT,Status VARCHAR(255),
+Login VARCHAR(255),HostName VARCHAR(255),
+BlkBy VARCHAR(255),DBName VARCHAR(255),
+Command VARCHAR(255),CPUTime INT,
+DiskIO INT,LastBatch VARCHAR(255),
+ProgramName VARCHAR(255),SPID2 INT,
+REQUESTID INT
+);
+
+INSERT INTO @tempTable EXEC sp_who2
+
+select * from @tempTable where SPID >55

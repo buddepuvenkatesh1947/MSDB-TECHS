@@ -1,0 +1,4 @@
+Script:
+=================
+setup.exe /Action=Install /UpdateEnabled=True /UpdateSource=".\Updates"
+=================

@@ -1,0 +1,15 @@
+Hello Team,
+
+Below is the summary on Disk threshold breach alert.
+Total Drive Space:
+Free Space Available:
+File-type related: SQL Server/OS/Others
+Files consuming space:
+Location of File:
+High Availability Database status (Log shipping/Mirroring/Replication) : Sync/Not sync / NA
+High Availability
+Failure Reason Category: Log file Full Due to Scheduled backup of large databases.
+Playbook Referred: Yes|No (If Yes Work as per Playbook Instruction)
+Explanation for Disk Threshold:
+Resolution: Created Cleanup Maintenance Plan| Deleted \Purged dump files\Shrunk database file\Increase Disk Space\Increase Monitoring Threshold
+Solution: Workaround/Permanent

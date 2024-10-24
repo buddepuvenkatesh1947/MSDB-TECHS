@@ -1,0 +1,102 @@
+-- Step 1: Create the table
+CREATE TABLE Employees (
+    EmployeeID INT ,
+    FirstName NVARCHAR(50),
+    LastName NVARCHAR(50),
+	NickName NVARCHAR(50) NULL,
+    Department NVARCHAR(50),
+    Salary DECIMAL(10, 2),
+    ManagerID INT
+);
+
+-- Step 2: Insert data, including NULL values
+
+INSERT INTO Employees (EmployeeID, FirstName, LastName, NickName, Department, Salary, ManagerID) 
+VALUES 
+(1, 'Rajesh', 'Sharma', NULL, 'IT', 75000.00, NULL),
+(2, 'Sanjana', 'Reddy', 'Sanju', 'Finance', 82000.00, 1),
+(3, 'Vikram', 'Mehra', NULL, 'HR', NULL, 2),
+(4, 'Anjali', 'Patil', 'Anju', 'Marketing', 68000.00, 2),
+(5, 'Ravi', 'Kumar', 'Rav', 'Operations', NULL, NULL),
+(6, 'Priya', 'Iyer', NULL, 'IT', 92000.00, 1);
+
+-- Step 3: Query to view the data
+SELECT * FROM Employees;
+
+
+select count(*) from Employees
+
+INSERT INTO Employees (EmployeeID, FirstName, LastName, NickName, Department, Salary, ManagerID) 
+VALUES 
+(NULL, NULL, NULL, NULL, NULL, NULL ,NULL)
+
+select count(salary) from Employees
+
+select * FROM Employees where EmployeeID 
+
+select * FROM Employees where EmployeeID is not null
+
+
+select * FROM Employees where ManagerID is not Null and EmployeeID = 1
+
+select EmployeeID,FirstName,LastName,Department,isnull(Salary, 0) As Salary,ManagerID  FROM Employees;
+
+select EmployeeID,FirstName,LastName,Department,nullIF(Salary, 75000.00)As Salary ,ManagerID  FROM Employees;
+-- Replace NULL salary with 0
+SELECT EmployeeID, FirstName, ISNULL(Salary, 0) AS Salary FROM Employees;
+SELECT EmployeeID, FirstName, COALESCE(Salary, 0) AS Salary FROM Employees;
+
+-- Get the first non-NULL value from MiddleName, NickName, or a default value
+SELECT EmployeeID, FirstName, LastName ,NickName FROM Employees;
+
+SELECT EmployeeID, NickName,Lastname FROM Employees;
+
+SELECT EmployeeID, COALESCE( NickName,Lastname, 'No Name') AS PreferredName FROM Employees;
+
+-- Assume we have a complex scenario where we prefer a middle name over a nickname, but if neither exists, show 'Unknown'
+SELECT EmployeeID, Lastname, NickName, FirstName  FROM Employees;
+
+SELECT EmployeeID, 
+       COALESCE( NickName, FirstName + ' (Unknown)') AS PreferredName FROM Employees;
+
+
+SELECT AVG(Salary) AS AvgSalary
+FROM Employees;
+
+
+
+
+SELECT EmployeeID,
+       CASE 
+           WHEN Salary IS NULL THEN 'No Salary'
+           ELSE 'Has Salary'
+       END AS SalaryStatus
+FROM Employees;
+
+SELECT * FROM Employees
+ORDER BY Salary ASC 
+
+SELECT * FROM Employees
+ORDER BY Salary desc 
+
+
+
+DBCC USEROPTIONS  
+GO
+
+SET ANSI_NULLS On --ansi_nulls 
+GO
+IF (NULL=NULL)
+    PRINT 'EQUAL'
+ELSE
+    PRINT 'NOT EQUAL'
+GO
+
+
+SET ANSI_NULLS Off --concat_null_yields_null
+GO
+IF (NULL=NULL)
+    PRINT 'EQUAL'
+ELSE
+    PRINT 'NOT EQUAL'
+GO

@@ -1,0 +1,12 @@
+---How to Use a CASE Statement in the WHERE Clause?
+
+select count(*) from  [WideWorldImporters].[Sales].[Invoices] --70510
+
+
+SELECT InvoiceID, CustomerID,
+AccountsPersonID, ContactPersonID
+FROM [WideWorldImporters].[Sales].[Invoices]
+WHERE 1 = CASE WHEN AccountsPersonID = ContactPersonID THEN 1
+ELSE 0
+END
+GO

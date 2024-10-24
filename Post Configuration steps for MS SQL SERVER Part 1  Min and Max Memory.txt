@@ -1,0 +1,19 @@
+========================
+EXEC sys.sp_configure N'show advanced options', N'1'  
+RECONFIGURE WITH OVERRIDE
+GO
+DECLARE @ServerMemory int = (SELECT (total_physical_memory_kb/1024) AS total_physical_memory_mb FROM sys.dm_os_sys_memory)
+DECLARE @setMemory int = (SELECT @ServerMemory*(.80))
+DECLARE @setminMemory int = 2048
+EXEC sys.sp_configure N'max server memory (MB)', @setMemory
+
+EXEC sys.sp_configure N'min server memory (MB)', @setminMemory
+GO
+RECONFIGURE WITH OVERRIDE
+GO
+EXEC sys.sp_configure N'show advanced options', N'0'  RECONFIGURE WITH OVERRIDE
+GO
+
+PRINT 'Max Memory Changed Successfully';
+PRINT 'Min Memory Changed Successfully';
+===================================

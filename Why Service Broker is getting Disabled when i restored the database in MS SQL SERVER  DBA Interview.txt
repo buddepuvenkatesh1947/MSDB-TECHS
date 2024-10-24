@@ -1,0 +1,39 @@
+--select name,is_broker_enabled,service_broker_guid from sys.databases
+-- create a database
+CREATE DATABASE TestDB;
+Go
+USE TestDB;
+GO
+
+-- run DBCC CHECKDB on it
+DBCC CHECKDB (TestDB);
+
+-- view the boot page
+DBCC TRACEON (3604);
+DBCC DBINFO (TestDB);
+-- save the output of DBCC DBINFO to a text file.
+
+-- back the database up
+BACKUP DATABASE TestDB
+TO DISK = 'C:\TestDB.bak';
+
+-- restore a copy of it
+RESTORE DATABASE TestDB_Restored
+FROM DISK = 'C:\TestDB.bak'
+WITH MOVE 'TestDB' TO 'C:\TestDB_R.mdf',
+MOVE 'TestDB_log' TO 'C:\TestDB_R.ldf'
+
+
+RESTORE DATABASE TestDB_Restoreds
+FROM DISK = 'C:\TestDB.bak'
+WITH MOVE 'TestDB' TO 'C:\TestDB_Rs.mdf',
+MOVE 'TestDB_log' TO 'C:\TestDB_Rs.ldf',
+New_broker
+
+-- view the boot page from the restored copy
+DBCC TRACEON(3604)
+DBCC DBINFO (TestDB_Restoreds);
+-- save the output of DBCC DBINFO to another text file.
+
+select name,is_broker_enabled,service_broker_guid from sys.databases
+where name in ('TestDB','TestDB_Restored','TestDB_Restoreds')

@@ -1,0 +1,37 @@
+Hello Team,
+
+We have received "System Has Rebooted" alert from the server Lenovo and 
+
+Below are our observation and summary of findings on the alert for Server Restart.
+
+Hostname:Lenovo 
+Status of SQL Server Services: Online
+Status of all User and system database: Online
+Status of SQL Agent Jobs during restart of system: Successful
+Status of High Availability Database : NA
+Status of Resource if running on Cluster server: NA
+Event Viewer Log for Restart of Server: (Windows log ID: 1074)
+========================
+Log Name:      System
+Source:        User32
+Date:          14-01-2024 02:43:26 AM
+Event ID:      1074
+Task Category: None
+Level:         Information
+Keywords:      Classic
+User:          LENOVO\Lenovo
+Computer:      Lenovo
+Description:
+The process C:\WINDOWS\Explorer.EXE (LENOVO) has initiated the power off of computer LENOVO on behalf of user LENOVO\Lenovo for the following reason: Other (Unplanned)
+ Reason Code: 0x0
+ Shutdown Type: power off
+ Comment: 
+=======================
+
+Any reported error in SQL Server Error Log: No suspicious error recorded in the SQL error logs.
+Playbook Referred: Yes
+Solution: Permanent
+
+Currently all the services are up and running fine, all database are UP and running on multi-user mode.
+
+Hence we are closing this ticket.

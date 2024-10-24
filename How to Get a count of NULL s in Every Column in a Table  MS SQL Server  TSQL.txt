@@ -1,0 +1,40 @@
+https://www.richardswinbank.net/tsql/count_nulls
+============================================
+DECLARE @schema NVARCHAR(128) = 'myschema'
+DECLARE @table NVARCHAR(128) = 'MyTable'
+ 
+DECLARE @sumCols NVARCHAR(MAX) = ''
+DECLARE @unpivotCols NVARCHAR(MAX) = ''
+DECLARE @sql NVARCHAR(MAX) = ''
+ 
+SELECT
+  @sumCols += '
+  , SUM(CASE WHEN [' + COLUMN_NAME + '] IS NULL THEN 1 ELSE 0 END) AS [' + COLUMN_NAME + ']'
+, @unpivotCols += '
+  , [' + COLUMN_NAME + ']'
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @schema
+AND TABLE_NAME = @table
+ 
+SET @sql = 'WITH cte AS (
+  SELECT
+    ' + SUBSTRING(@sumCols, 6, LEN(@sumCols)) + '
+  , COUNT(*) AS [ROWS IN TABLE]
+  FROM [' + @schema + '].[' + @table + ']
+)
+SELECT 
+  '', ['' + ColumnName + '']'' AS ColumnName
+, NullCount
+FROM cte UNPIVOT (
+  NullCount FOR ColumnName IN (
+    ' + SUBSTRING(@unpivotCols, 6, LEN(@unpivotCols)) + '
+  , [ROWS IN TABLE]
+  )
+) upvt
+ORDER BY 
+  CASE ColumnName WHEN ''ROWS IN TABLE'' THEN 1 ELSE 2 END
+, NullCount DESC'
+ 
+PRINT @sql
+EXEC(@sql)
+

@@ -1,0 +1,61 @@
+CREATE TABLE heap (
+    id int ,
+    name VARCHAR(100),
+    country VARCHAR(100)
+);
+
+
+insert into heap values (4,'harsha','USA')
+
+select * from heap where id = 4
+
+insert into heap values (2,'sai','India')
+
+select * from heap where country = 'USA'
+
+create clustered index ix_id on heap(id)
+
+create nonclustered index ix_country on heap(country)
+
+select * from heap where id = 4
+
+
+select id,name,country from heap where country = 'usa'
+--non clustered indexs will maintain clustered index information which is usally called as
+--clustering key
+==========================================
+Create Table Employees
+(
+	Id int identity,
+	[Name] varchar(50),
+	Email varchar(50),
+	Department varchar(50)
+)
+Go
+
+SET NOCOUNT ON
+Declare @counter int = 1
+While(@counter <= 1000000)
+Begin
+	Declare @Name nvarchar(50) = 'ABC ' + RTRIM(@counter)
+	Declare @Email nvarchar(50) = 'abc' + RTRIM(@counter)
+	Declare @Dept nvarchar(10) = 'Dept ' + RTRIM(@counter)
+    Insert into Employees values (@Name, @Email, @Dept)
+
+	Set @counter = @counter +1
+	If(@Counter%100000 = 0)
+		Print RTRIM(@Counter) + ' rows inserted'
+End
+
+
+select * from Employees
+
+create clustered index ix_id on Employees(id)
+
+select * from Employees where id = 100
+
+drop index ix_id on Employees
+
+create nonclustered index ix_name on Employees(name,department)
+
+select * from Employees where name  = 'ABC 100'

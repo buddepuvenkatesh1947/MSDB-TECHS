@@ -1,0 +1,29 @@
+--Why we use count(*) to count values in the table.
+
+Drop table test
+
+CREATE TABLE test(
+    ID INT,
+    Name VARCHAR(50),
+    Age INT
+);
+
+INSERT INTO test (ID, Name, Age) VALUES (1, 'John', 25);
+INSERT INTO test (ID, Name, Age) VALUES (2, 'Alice', 30);
+INSERT INTO test (ID, Name, Age) VALUES (NULL, 'Bob', NULL);
+INSERT INTO test (ID, Name, Age) VALUES (4, 'Jane', 40);
+INSERT INTO test (ID, Name, Age) VALUES (NULL, NULL, NULL);
+
+
+
+select count(id) from test
+
+select count(name) from test
+
+select count(age) from test
+
+select count(*) from test
+
+--COUNT(*) is used to count all the rows in a table regardless of whether there are NULL values in any of the columns.
+--It counts all rows, including those where one or more column values might be NULL.
+

@@ -1,0 +1,47 @@
+SELECT 
+    name, 
+    CASE 
+        WHEN is_parameterization_forced = 0 THEN 'Simple' 
+        ELSE 'Forced' 
+    END AS Parameterization_Mode 
+FROM sys.databases;
+
+
+
+DBCC FREEPROCCACHE
+
+
+SELECT * FROM AdventureWorks2019.Sales.CreditCard WHERE CreditCardID = 11
+GO
+SELECT * FROM AdventureWorks2019.Sales.CreditCard WHERE CreditCardID = 207
+
+
+Use AdventureWorksDW2019
+Go
+SELECT financekey, date
+FROM AdventureWorksDW2019.dbo.factfinance
+WHERE ISNULL(date, '1900-01-01') > '2008-06-01';
+
+
+Use AdventureWorksDW2019
+Go
+SELECT financekey, date
+FROM AdventureWorksDW2019.dbo.factfinance
+WHERE ISNULL(date, '1900-01-01') > '2009-06-01';
+
+
+
+EXEC sp_create_plan_guide
+  @name=N'PlanGuide_for_sale_creditcard', 
+  @stmt=N'SELECT * FROM AdventureWorks2019.Sales.CreditCard WHERE CreditCardID = @CID', 
+  @type = N'TEMPLATE', 
+  @module_or_batch = NULL, 
+  @params = N'@CID int', 
+  @hints = N'OPTION(PARAMETERIZATION SIMPLE)'; 
+GO
+
+===========================================
+https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms175037(v=sql.105)
+
+https://www.mssqltips.com/sqlservertip/2935/sql-server-simple-and-forced-parameterization/
+

@@ -1,0 +1,65 @@
+===
+How to Build SQL Server 2022 DBA Real Time Home Lab              
+in VMware workstation
+Hardware Minimum Requirements:
+Virtualization support in Bios
+8 GB RAM
+2.5 GH processor or more
+500 HDD or 1TB HDD | SSD would be faster.
+Other Requirements: 
+64 Bit OS (windows 7/8/10)
+VMware workstation or hyper v or Virtual Box 
+Windows SQL Server 2022
+Windows Server 2022
+
+My environment:
+32 GB Ram
+1 TB SSD and 1 TB HDD
+Intel with 4 physical cores with virtualization support (4x2=8Cores) 
+Windows 10 64 bit os
+Vmware workstation 17 Pro
+
+Basics steps we need to check For Error Free installation
+1. All Member servers should be part of the Domain
+2. Firewall should be off 
+3. Check communication between and Domain and member servers 
+4. Check Nslookup for all servers (it means DNS is resolving hostname to IP and vice versa)
+5. Login with Domain administrator or user which is having Domain Level Permissions every where
+
+Step By step:
+1. Enable Virtualization (VT) In BIOS
+2. Install VMware workstation
+3. Install 3 Windows Server OS 
+4. Install VMware Tools [Environment Specific]
+5. Disable IPv6 and configure IPs as shown in the demo environment Picture
+6. Install Extra network adapter for node 2 & node 3 for heartbeat 
+7. Install Active Directory and configure Forward Lookup and Reverse Lookup Zones in Domain OS.
+8. Disable the password complexity policy in domain 
+9. Disable the public, Private and domain firewalls rules in domain os.
+10. Disable the public and private firewall rules in node 2 and node 3 
+11. Join the Node 1 and node 2 to domain.
+12. Disable the domain firewall rule in node 2 and node3
+13. Install .Net 3.5 Framework in Node 1 & Node 2
+14. Install ISCSI Target Server and create Virtual Hard disks in domain and Assign to Node 1 & Node 2
+15. Connect to ISCSI Target through ISCSI Initiator and Assign Drive Letters (Note: Drive Letters Should and names should be same In Node 1 & Node 2)
+16. Install Fail-over clustering Feature in Node 1 & Node 2
+17. Install Fail-over Cluster Automation Server Feature in Node 1 &
+ Node 2 
+18. Install ssms in node1 and node2
+19. Install Standalone SQL Server 2022 with sql2022hyd01 in node1
+20. Install Standalone SQL Server 2022 with sql2022hyd02 in node2
+21. Enable Always on feature On Both Standalone Instances in Node 1 & Node 2 and configure always on
+22. Create and Validate Cluster
+23. Install SQL failover cluster in node1 with (sql202201) 
+24. Install SQL Server With add a node to cluster Option in Node2   {Note: This works as Active - Passive SQL Cluster}
+25. Install SQL failover cluster in node1 with (sql202202) 
+26. Install SQL Server With add a node to cluster Option in Node2   {Note: This works as Active - Active SQL Cluster}
+27. Restore Any Sample Databases like Adventure works for Replication Practical
+28. Configure Log shipping, Mirroring & Transactional Replication
+
+
+Note:  Like the Video
+                Comment Your Ideas and Doubts
+  Share the video If you like 
+All the Best
+==========================================================================

@@ -1,0 +1,10 @@
+How to Listen on Multiple TCP Ports in MS SQL Server
+====================
+
+changing configure manager set port number default 1433, you have to change this action
+
+
+before change check the cmd prompt
+
+
+netstat -abo | findstr 1900

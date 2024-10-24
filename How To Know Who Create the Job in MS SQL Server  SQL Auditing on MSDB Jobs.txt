@@ -1,0 +1,28 @@
+USE MSDB
+GO
+
+CREATE TABLE dbo.ObjectAuditLog (
+    EventDateTime datetime NOT NULL,
+    EventType nvarchar(100) NOT NULL,
+    ObjectName nvarchar(500) NOT NULL,
+    LoginName nvarchar(100) NOT NULL,
+    JobID uniqueidentifier NOT NULL,
+    JobName nvarchar(128) NULL,
+    JobOwner nvarchar(128) NULL
+) ON PRIMARY
+GO
+=========================
+Create TRIGGER JobCreationAuditTrigger
+ON msdb.dbo.sysjobs
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @job_name NVARCHAR(128), @login_name NVARCHAR(128), @event_type NVARCHAR(50), @job_id UNIQUEIDENTIFIER, @job_owner NVARCHAR(128);
+
+    SELECT @job_name = name, @login_name = suser_sname(), @event_type = 'Job Created', @job_id = job_id, @job_owner = SUSER_SNAME(owner_sid) FROM inserted;
+
+    INSERT INTO ObjectAuditLog(EventDateTime, EventType, ObjectName, LoginName, JobID,JobName,JobOwner)
+    VALUES (GETDATE(), @event_type, @job_name, @login_name, @job_id,@job_name,@job_owner);
+END;

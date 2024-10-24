@@ -1,0 +1,52 @@
+# Define the path to the server list file
+$filePath = "C:\Test\serverlist.txt"
+
+# Read the content of the file
+$servers = Get-Content -Path $filePath
+
+# Create an empty array to store the results
+$results = @()
+
+# Loop through each server and retrieve logged-in users
+foreach ($server in $servers) {
+    # Retrieve logged-in users for the current server
+    $queryOutput = query user /server:$server
+    $users = $queryOutput | Select-Object -Skip 1 | ForEach-Object {
+        $parts = $_.Trim() -split '\s+'
+        [PSCustomObject]@{
+            'System Name' = $server
+            'Current Logged User' = $parts[0]
+            'Last Logon Time' = if ($parts.Count -gt 1) { $parts[2] + " " + $parts[3] } else { "N/A" }
+        }
+    }
+
+    # If no users are logged in, add a row indicating so
+    if (-not $users) {
+        $users = [PSCustomObject]@{
+            'System Name' = $server
+            'Current Logged User' = 'No users logged in'
+            'Last Logon Time' = 'N/A'
+        }
+    }
+
+    # Add the user(s) to the results array
+    $results += $users
+}
+
+# Convert results to HTML format
+$htmlOutput = "<style>
+TABLE {border-width: 1px; border-style: solid; border-color: black; border-collapse: collapse;}
+TH {border-width: 1px; padding: 3px; border-style: solid; border-color: black; background-color: #6495ED;}
+TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; }
+</style>"
+
+$htmlOutput += $results | ConvertTo-Html -Fragment
+
+# Generate a timestamp
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+# Save the HTML output to a file with timestamp in the filename
+$htmlOutput | Out-File -FilePath "C:\Test\Users_Logged_in_$timestamp.html" -Encoding UTF8
+
+# Output the timestamp
+Write-Host "Output file created: C:\Test\Users_Logged_in_$timestamp.html"

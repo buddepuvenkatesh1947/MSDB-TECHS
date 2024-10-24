@@ -1,0 +1,7 @@
+https://blog.sqlauthority.com/2021/03/17/sql-server-list-expensive-queries-updated-march-2021/
+
+https://blog.sqlauthority.com/2021/09/20/sql-server-troubleshooting-high-cpu/
+
+https://www.sqlskills.com/blogs/jonathan/digging-into-the-sql-plan-cache-finding-missing-indexes/
+
+https://www.mssqltips.com/sqlservertip/6599/sql-server-performance-tuning-with-execution-plans-and-new-indexes/

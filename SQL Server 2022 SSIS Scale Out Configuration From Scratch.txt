@@ -1,0 +1,24 @@
+Step By Step:
+1.In this demo, I am going with Option 1.       
+ •Node 1 as a master.       
+ •Node 2 & Node 3 as workers.
+
+2.Install integration services along with Scale Out Master on Node1 
+
+3.Copy the Scale Out Master certificate from Scale Out Master (Node 1) to all worker nodes [Node2 & Node3] 
+Note: You can find this certificate in the installation directory.
+In your case, the installation path may vary: 
+C:\ProgramFiles\Microsoft SQL Server\160\DTS\Binn\SSISScaleOutMaster.cer
+
+4.Install integration services along with Scale Out worker on Node1 & Node2.
+
+5.Copy the Scale Out worker certificate from both workers (Node2 & Node3) to the master (Node1).
+
+6.Install both worker certificates on the master.
+
+7.Create SSIS DB catalog on the master and select the "Enable this server as scale-out master" option.
+
+8.Select "Manage scale-out" and add workers.
+
+9.Deploy the sample package and run it in scale-out worker mode. Verify the results.
+Note:Please enable sa authentication for master node. And also keep same account to avoid issues further.

@@ -1,0 +1,20 @@
+Roster
+In Our organization we used to send any planned leaves 10 days before it self via email.
+We need to see the current month Roaster last week and need to Plan the Roster for next month.
+
+We are having 3 shifts
+Shifts	Starts 	Ends
+First Shift		6.30 AM	3.30 PM
+	General Shift	9 Am	6 PM
+Second Shift 		1.30 PM	10 PM
+	Evening shift 	6 PM	3.30 AM
+Night Shit		10 PM	7 AM
+
+•	Generally, we keep one lead…two senior data admins in Shift. Depending the workload adjustment will happen.
+•	If no work is there in First shift, then they may ask to come in General shift so that the resource will be available up to 6 PM clock.
+•	We used to send the roster 2 days before of month end.so adjustments can be done further if any.
+
+
+
+Reply
+

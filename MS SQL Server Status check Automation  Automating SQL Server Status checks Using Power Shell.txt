@@ -1,0 +1,62 @@
+
+#Step 1: Get Server List
+$servers = Get-Content "C:\Test\serverlist.txt"
+
+#Step 2: Retrive and Filter SQL Services
+$SQLServices = Get-WmiObject win32_service -computer $servers |
+Where-Object {
+    $_.name -match '^*SQL*' -and 
+    ($_.Name -ne 'SQLBrowser') -and 
+    ($_.Name -ne 'SQLWriter') -and 
+    ($_.Name -notlike '*SQLTELEMETRY*')
+} | 
+Select-Object SystemName, Name,state | Sort-Object State
+
+$SQLServices
+$path = "C:\"
+$formattedDate = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$OutputFileHTML = $path+'\' + 'SQLServices-' + $formattedDate +'.html'
+
+$Header = @"
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; }
+h1 { font-size: 24px; color: #333; }
+TABLE {border-width: 1px; border-style: solid; border-color: black; border-collapse: collapse;}
+th { border-width: 1px; padding: 8px; border-style: solid; border-color: #ccc; background-color: #4CAF50; color: white; }
+td { border-width: 1px; padding: 8px; border-style: solid; border-color: #ccc; text-align: left; }
+tr:nth-child(even) { background-color: #f2f2f2; }
+tr:hover { background-color: #ddd; }
+</style>
+"@
+
+
+# Create HTML rows with conditional coloring
+$rows = $SQLServices | ForEach-Object {
+    $color = if ($_.State -eq 'Running') { 'green' } elseif ($_.State -eq 'Stopped') { 'red' } else { 'black' }
+    "<tr><td>$($_.SystemName)</td><td>$($_.Name)</td><td style='color: $color;'>$($_.State)</td></tr>"
+}
+
+# Combine header, rows, and footer into final HTML
+$html = @"
+<html>
+<head>
+$Header
+</head>
+<body>
+<h1>SQL Service Status:</h1>
+<table>
+<tr><th>SystemName</th><th>Name</th><th>State</th></tr>
+$($rows -join "`n")
+</table>
+</body>
+</html>
+"@
+
+# Output to file
+$html | Out-File $OutputFileHTML
+ #Install-Module -name ImportExcel
+Import-Module -Name ImportExcel
+
+#$SQLServices | ConvertTo-Html -Head $Header -body "<h1>SQL Service Status</h1>" | Out-File $OutputFile 
+$SQLServices | Select-Object SystemName, Name,state | Sort-Object State | Export-Excel -Path $path\SQLServices.xlsx
+$SQLServices | Format-Table -AutoSize | Out-File $path\SQLServices.txt

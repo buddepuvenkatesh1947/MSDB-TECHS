@@ -1,0 +1,33 @@
+-- Create a temporary table
+CREATE TABLE #TempDatabaseInfo (
+    ProductMajorVersion INT,
+    Name NVARCHAR(128),
+    CompatibilityLevel INT,
+    CompatibilityDescription NVARCHAR(50) -- New column for Compatibility Description
+);
+
+-- Insert data into the temporary table
+INSERT INTO #TempDatabaseInfo
+SELECT
+    CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) AS ProductMajorVersion,
+    name,
+    compatibility_level,
+    CASE
+        WHEN CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) = 11 AND compatibility_level = 110 THEN 'Having Latest version'
+        WHEN CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) = 12 AND compatibility_level = 120 THEN 'Having Latest version'
+        WHEN CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) = 13 AND compatibility_level = 130 THEN 'Having Latest version'
+        WHEN CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) = 14 AND compatibility_level = 140 THEN 'Having Latest version'
+        WHEN CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) = 15 AND compatibility_level = 150 THEN 'Having Latest version'
+        WHEN CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) = 16 AND compatibility_level = 160 THEN 'Having Latest version'
+        ELSE 'Please upgrade to ' + CAST(CONVERT(INT, SERVERPROPERTY('ProductMajorVersion')) * 10 AS NVARCHAR(5))
+    END AS CompatibilityDescription
+FROM
+    sys.databases
+WHERE
+    database_id > 4;
+
+-- Query the temporary table
+SELECT name,CompatibilityLevel,CompatibilityDescription FROM #TempDatabaseInfo;
+
+-- Drop the temporary table when done
+DROP TABLE #TempDatabaseInfo;

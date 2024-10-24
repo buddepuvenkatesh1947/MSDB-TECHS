@@ -1,0 +1,70 @@
+=====
+How to Build SQL Server 2019 DBA Real Time Home Lab in Azure
+
+                    Dc                            Node1                     Node2
+Private IP 10.1.1.4                     10.1.1.5                     10.1.2.4
+Public IP 20.25.109.3              	20.163.146.250   		172.174.29.62
+Cluster                                      10.1.1.50                    10.1.2.50
+Cluster                                      10.1.1.100             10.1.2.100
+Always on Listener IP              10.1.1.75                      10.1.2.75
+Standalone Instance   NODE1\SQL2019HYD01 NODE2\SQL2019HYD02
+Clustered Instance  SQLCLUSTER01\SQL201901 SQLCLUSTER02\SQL201902
+
+Note:The above public ips are controlled by Azure itself.we dont have control on this.
+
+Environment: Multi subnet Cluster
+1. One windows server 2019 OS as Domain (ABC.com)
+2. Another two windows Servers 2019 os as a member server.
+
+Note: Building a real time home lab in azure is different when compared to on prem.
+Previously we had VNN in cluster the VNN will have IP on active node however in place of VNN we are having DN.
+In DNN Cluster will have IPs all Nodes participated in DNS. 
+For Mutli subnet we don’t need Load balancer for listener. However it’s required for single subnet.
+2. We can configure load balance if the participated VMs are in same available set or Zone 
+Basics steps we need to check For Error Free installation
+1. All Member servers should be part of the Domain
+2. Firewall should be off (Domain, Public&Private)
+3. Check communication between and Domain and member servers 
+5. Login with Domain administrator or user which is having Domain Level Permissions every where
+6. Some times you are unable to connect to instance when u try to connect from passive node. at that time u have need to add the respective series of cluster IPs in the IP configuration of respective nodes via azure portal.
+
+Step By step:
+1. Create a Resource group and Vnet with 2 subnets.
+VNet:10.1.0.0/16
+Subnet A: 10.1.1.0/24
+Subnet B: 10.2.1.0/24
+Deploy one windows server 2019 with name of DC in Subnet A and install active directory domain Services & DNS & iSCSI Target Server and do configure domain with ABC.com
+2. Deploy two windows server 2019 OS with the names of Node1 & Node2
+3. Node1 should be deployed in Subnet A and node2 is in Subnet B 
+4. Add Domain Private IP address in Node1 & Node2 via Azure portal.
+5. ADD all Servers into Multi desk for Easy administration(Optional)
+6. Turn off the Domain, Public and Private firewall in Domain.
+7. Turn off the Public, Private Firewall in Node1 & Node2.
+8. Join the Node1 & Node2 into Domain.
+9. Disable the domain firewall rules in Node1 & Node2.
+10. Create Virtual Hard disks in domain and Assign to Node 1 & Node 2
+11. Connect to ISCSI Target through ISCSI Initiator and Assign Drive Letters in Node 1 & 2 (Note: Drive Letters & Format & Allocation Should Be same In Node 1 & Node 2)
+12. Install .Net 3.5, Failover cluster, failover cluster server automation in Node1 & Node2
+13. Create and Validate Cluster by below powershell command instead of GUI
+New-Cluster -Name winclu -Node node3,node5 -StaticAddress  10.1.1.25 ,10.1.2.25 -NoStorage -AdministrativeAccessPoint ActiveDirectoryAndDns -ManagementPointNetworkType Singleton
+14. Install SQL failover cluster in node1 with (sql201901) 
+15. Install SQL Server With add a node to cluster Option in Node2
+{Note: This works as Active - Passive SQL Cluster}
+16. Install SSMS in node1 and node2
+17. Install SQL failover cluster Instance in node1 with (sql201902) 
+18. Install SQL Server With add a node to cluster Option in Node2
+{Note: This works as Active - Active SQL Cluster} (This is Optional)
+19. Install Standalone SQL Server 2019 with sql2019hyd01 in node1
+20. Install Standalone SQL Server 2019 with sql2019hyd02 in node2
+21. Enable Always on feature On Both Standalone Instances in Node 1 & Node 2 and configure always on
+22. Restore Any Sample Databases like Adventure works or North wind for Replication Practical
+23. Configure Log shipping, Mirroring & Transactional Replication.
+
+Finally we build the real time home lab and when you want to do any issue u can test in you lab and implement accordingly. 
+Note:  Like the Video
+                    Comment Your Ideas and Doubts
+     Share the video If you like 
+  
+
+All the Best
+=================================================================

@@ -1,0 +1,35 @@
+-- Create the Employees table
+CREATE TABLE Employees (
+    EmployeeID INT PRIMARY KEY,
+    FirstName VARCHAR(50),
+    LastName VARCHAR(50),
+    Department VARCHAR(50)
+);
+
+-- Insert some records into the Employees table
+INSERT INTO Employees (EmployeeID, FirstName, LastName, Department)
+VALUES
+    (1, 'John', 'Doe', 'HR'),
+    (2, 'Jane', 'Smith', 'Marketing'),
+    (3, 'Michael', 'Johnson', 'IT'),
+    (4, 'Emily', 'Brown', 'Finance'),
+    (5, 'John', 'Doe', 'HR'),
+    (6, 'Jane', 'Smith', 'Marketing'),
+    (7, 'Michael', 'Johnson', 'IT'),
+    (8, 'Emily', 'Brown', 'Finance'),
+	(9, 'Emily', 'Brown', 'Finance');
+
+-- Set the department you want to filter on
+
+SELECT Department, count(*)
+FROM Employees 
+group by Department
+having  count(*) >= 2
+
+
+CREATE NONCLUSTERED INDEX IX_Department ON Employees (Department)
+WITH (
+    ONLINE = ON
+);
+SQL Server Segment operators iare used to divide the input data into different groups based on their values. Assume that we run the below SELECT statement that uses the ROW_NUMBER() ranking function to rank the customers regarding their credits, including the Actual SQL Server Execution Plan of the query: 
+select *,ROW_NUMBER() Over(Partition by Dept Order by Emp_id) as Rno from EMp

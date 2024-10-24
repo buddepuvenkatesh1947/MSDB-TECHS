@@ -1,0 +1,4 @@
+Declare @elasticpoolname varchar(max) 
+set @elasticpoolname = 'elasticpooltest'
+select 'ALTER DATABASE' + ' '+ '[' + name + ']' + ' '+ 'MODIFY ( SERVICE_OBJECTIVE = ELASTIC_POOL (name =[' + @elasticpoolname + ']' + ') );' from sys.databases 
+where name not in ('master')

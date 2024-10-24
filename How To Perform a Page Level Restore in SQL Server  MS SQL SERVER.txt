@@ -1,0 +1,39 @@
+How To Perform a Page Level Restore in SQL Server  MS SQL SERVER
+=======================
+
+create database test
+
+use test
+Go
+CREATE TABLE Testtable (
+    ID int IDENTITY(1,1) PRIMARY KEY,
+    Name nvarchar(100) NOT NULL
+);
+INSERT into Testtable VALUES  ('Harsha kalki')
+
+	DBCC IND('Test','Testtable',-1)
+	DBCC IND('Test','Testtable',-2)
+	
+BACKUP DATABASE [test] TO  DISK = N'C:\test.bak' WITH NOFORMAT, 
+NOINIT,  NAME = N'test-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  
+STATS = 10
+GO
+
+
+	DBCC TRACEON(3604)
+	GO
+
+	DBCC PAGE('Test',1,352,3)
+--352
+--	Understanding the Print Levels:
+--0: Only page header information is displayed.
+--1: Page header plus per-row information (limited details).
+--2: Page header plus full row information.
+--3: Page header, full row information, and page data (detailed information).
+
+select 352*8192--2883584
+
+
+use test
+Go
+select * from Testtable

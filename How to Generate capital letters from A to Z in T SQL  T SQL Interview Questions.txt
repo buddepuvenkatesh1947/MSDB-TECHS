@@ -1,0 +1,11 @@
+--How to Generate capital letters from A to Z
+
+with Aplha as (
+select char(65) as letter
+union all
+select char(ASCII(letter) +1 )
+from Aplha
+where ASCII(letter) < 90
+)
+
+select * from Aplha

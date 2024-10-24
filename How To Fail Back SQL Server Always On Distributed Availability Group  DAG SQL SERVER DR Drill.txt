@@ -1,0 +1,11 @@
+How To Fail Back SQL Server Always On Distributed Availability Group  DAG SQL SERVER DR Drill
+====================
+
+
+https://www.youtube.com/watch?v=Is9EGuHK8gY&list=PL-xn4QSr30HYlJ2xNOnldfc8XxBtICDfX&index=240
+
+
+
+
+
+https://www.mssqltips.com/sqlservertip/6435/manual-failover-of-sql-server-always-on-distributed-availability-group-for-disaster-recovery-testing/

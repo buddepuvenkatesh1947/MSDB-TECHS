@@ -1,0 +1,34 @@
+===========================================================================================================
+FROM clause:
+This is where the query starts. It identifies the tables from which data needs to be retrieved.
+
+JOIN clause:
+If there are multiple tables involved, the JOIN clause is used to combine records from these tables based on specified conditions.
+
+WHERE clause:
+The WHERE clause is used to filter records based on specified conditions. Rows that meet the specified criteria are included in the result set.
+GROUP BY clause:
+
+If GROUP BY is present, the result set is then grouped based on the specified columns. Aggregate functions (like SUM, AVG, COUNT) are often used with GROUP BY to perform calculations within each group.
+
+HAVING clause:
+The HAVING clause is used to filter the groups formed by the GROUP BY clause based on specified conditions. It is similar to the WHERE clause but operates on groups rather than individual rows.
+
+SELECT clause:
+The SELECT clause is used to specify the columns that should appear in the result set. It can include aggregate functions, column aliases, and expressions.
+
+
+ORDER BY clause:
+If specified, the ORDER BY clause is used to sort the result set based on one or more columns. Sorting can be done in ascending (ASC) or descending (DESC) order.
+
+LIMIT/OFFSET/ TOP clauses:
+The LIMIT and OFFSET clauses (or equivalent, depending on the database system) are used for pagination or to restrict the number of rows returned. They help in controlling the size of the result set.
+
+Understanding the order of execution of SQL query clauses is important for writing efficient and effective queries. By following the correct order, you can ensure that your queries are processed in a way that minimizes the amount of work the database engine has to do.
+
+
+To Remember Easily
+Fast weasels gracefully Having, silently over leaves
+
+====================================================================
+

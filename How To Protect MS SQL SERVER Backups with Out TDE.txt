@@ -1,0 +1,65 @@
+Select name, is_encrypted from sys.databases WHERE name = 'DBA'
+
+--Step1:Take the full database backup of Dba
+BACKUP DATABASE [dba] TO  DISK = N'D:\dba2022.bak' WITH NOFORMAT, NOINIT,  
+NAME = N'dba-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10
+GO
+
+--Step2:Create database master key
+USE master;
+Go
+CREATE MASTER KEY 
+ENCRYPTION BY PASSWORD = 'HYd@123';
+GO
+
+--Step3:Create certificate
+USE master;
+GO 
+CREATE CERTIFICATE TDE_Certificate
+       WITH SUBJECT='Certificate for TDE';
+GO
+
+--Step4:Create database encryption key
+USE dba
+GO
+CREATE DATABASE ENCRYPTION KEY
+WITH ALGORITHM = AES_256
+ENCRYPTION BY SERVER CERTIFICATE TDE_Certificate;  
+
+--Step5:Back up the certificate and the private key associated with the certificate
+USE master;
+GO
+BACKUP CERTIFICATE [TDE_Certificate]
+TO FILE = 'D:\TDE_Certificate_For_dbadatabase.cer'
+WITH PRIVATE KEY (file='D:\TDE_dba_private_CertKey.pvk',
+ENCRYPTION BY PASSWORD='HYd@123');
+
+--Step6:Turn on encryption on database
+ALTER DATABASE dba
+SET ENCRYPTION ON
+
+--Step8:Check encryption enabled
+Select name, is_encrypted from sys.databases
+Select * from sys.certificates
+-------------------------
+BACKUP DATABASE [DBA] TO DISK = N'C:\DBA2022_FULL.bak' 
+WITH NAME = N'dba-Full Database Backup',
+COMPRESSION, ENCRYPTION (ALGORITHM = AES_256, 
+SERVER CERTIFICATE = [TDE_Certificate]), 
+STATS = 10 
+GO
+-------------------------
+
+/*ADDITIONAL INFORMATION:
+
+Cannot find server certificate with thumbprint '0xA928B395E969DBE31B5F0657FA7B2F70C5D9DF32'.
+RESTORE HEADERONLY is terminating abnormally. (Microsoft SQL Server, Error: 33111)
+
+For help, click: https://docs.microsoft.com/sql/relational-databases/errors-events/mssqlserver-33111-database-engine-error
+
+------------------------------
+BUTTONS:
+
+OK
+------------------------------*/
+

@@ -1,0 +1,2 @@
+Syntax:
+SSMS-Setup-ENU.exe /Passive DoNotInstallAzureDataStudio=1

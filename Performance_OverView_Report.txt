@@ -1,0 +1,1270 @@
+USE [master]
+GO
+
+/****** Object:  StoredProcedure [dbo].[usp_Performance_OverView_Report]    Script Date: 09-05-2023 12:06:42 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE Procedure [dbo].[usp_Performance_OverView_Report]
+AS
+/***********************************************************************************************
+*Procedure: [usp_Performance_OverView_Report]
+*Purpose  : Provides Index Report for  all user databases.
+Index Report will provide below information in .HTML format
+1.	Fragmentation Report for Top 20 tables in all databases where page Count > 1000
+2.	Un-Used indexes	With Drop statements
+3.	Missing Indexes With Create Statements
+4.	Duplicate Indexes	
+5.	Heap Tables
+6.	User Read Indexes
+7.	User Write Indexes
+8.	Statistics Update
+***********************************************************************************************/
+set nocount on
+DECLARE @bcpCommand VARCHAR(8000)
+DECLARE @IsDBMailEnabled BIT
+declare @dbname varchar(1024)
+declare @sqlQuery nvarchar(max)
+DECLARE @hours BIGINT
+set @hours = 168
+DECLARE @UpTime VARCHAR(12), @StartDate DATETIME, @sqlmajorver BIGINT, @sqlcmd NVARCHAR(4000), @params NVARCHAR(500), @CheckDate datetime
+SELECT @sqlmajorver = CONVERT(BIGINT, (@@microsoftversion / 0x1000000) & 0xff)
+set @CheckDate = CURRENT_TIMESTAMP
+------------------------------------
+--Server UpTime
+------------------------------------
+IF @sqlmajorver = 9
+BEGIN
+	SET @sqlcmd = N'SELECT @StartDateOUT = login_time, @UpTimeOUT = DATEDIFF(mi, login_time, GETDATE()) FROM master..sysprocesses WHERE spid = 1';
+END
+ELSE
+BEGIN
+	SET @sqlcmd = N'SELECT @StartDateOUT = sqlserver_start_time, @UpTimeOUT = DATEDIFF(mi,sqlserver_start_time,GETDATE()) FROM sys.dm_os_sys_info';
+END
+
+SET @params = N'@StartDateOUT DATETIME OUTPUT, @UpTimeOUT VARCHAR(12) OUTPUT';
+
+EXECUTE sp_executesql @sqlcmd, @params, @StartDateOUT=@StartDate OUTPUT, @UpTimeOUT=@UpTime OUTPUT;
+
+--SELECT ltrim(rtrim(@StartDate)) AS SQLServer_UpTime 
+
+RAISERROR (N'Starting...', 10, 1) WITH NOWAIT
+
+DECLARE @HTML VARCHAR(MAX) 
+SET @HTML = ''       
+SET @HTML = '<HTML><BODY> 
+<FONT FACE="CALIBRI" SIZE=4> <BR>'+CHAR(13)+      
+'<H3><B><Center> Index Report For SQL Server  : '+@@SERVERNAME+' </B></Center></H3>       
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>             
+<TR BGCOLOR = LIGHTGREEN>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">SQLServer UpTime</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">Index Report Execution DateTime</FONT></TH>
+</TR>
+<style type="text/css">
+        body
+        {
+            font-family: Arial;
+            font-size: 10pt;
+        }
+        #scroll {
+    position:fixed;
+    right:10px;
+    bottom:10px;
+    cursor:pointer;
+    width:50px;
+    height:50px;
+    background-color:#3498db;
+    text-indent:-9999px;
+    display:none;
+    -webkit-border-radius:60px;
+    -moz-border-radius:60px;
+    border-radius:60px
+}
+#scroll span {
+    position:absolute;
+    top:50%;
+    left:50%;
+    margin-left:-8px;
+    margin-top:-12px;
+    height:0;
+    width:0;
+    border:8px solid transparent;
+    border-bottom-color:#ffffff;
+}
+#scroll:hover {
+    background-color:#e74c3c;
+    opacity:1;filter:"alpha(opacity=100)";
+    -ms-filter:"alpha(opacity=100)";
+}
+    </style>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script type = "text/javascript">
+        
+		$(document).ready(function(){ 
+    $(window).scroll(function(){ 
+        if ($(this).scrollTop() > 100) { 
+            $(''#scroll'').fadeIn(); 
+        } else { 
+            $(''#scroll'').fadeOut(); 
+        } 
+    }); 
+    $(''#scroll'').click(function(){ 
+        $("html, body").animate({ scrollTop: 0 }, 600); 
+        return false; 
+    }); 
+});
+    </script>'
+
+SELECT     @HTML = @HTML +    
+'<TR> <TD VALIGN="TOP"><B><CENTER><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(@StartDate,0) ))) + '</B></CENTER></FONT></TD>'
++ 
+'<TD VALIGN="TOP"><B><CENTER><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(@CheckDate,0) ))) + '</B></CENTER></FONT></TD></TR>'
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+-----------------------------------------------
+/* Index Section */
+-----------------------------------------------
+SELECT     @HTML = @HTML + 
+
+'<a href="#Index Fragmentation Report">1. Index Fragmentation Report</a><BR>
+<a href="#Un-Used Index Report">2. Un-Used Index Report</a><BR>
+<a href="#Duplicate Index Report">3. Duplicate Index Report</a><BR>
+<a href="#Missing Index Report">4. Missing Index Report</a><BR>
+<a href="#Heap - Tables Report">5. Heap - Tables Report</a><BR>
+<a href="#User Read Index Report">6. User Read Index Report</a><BR>
+<a href="#User Write Index Report">7. User Write Index Report</a><BR>
+<a href="#Statistics Update Report">8. Statistics Update Report</a>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+--------------------------------------
+--Instance Name finding
+--------------------------------------
+declare @instancename varchar (200)
+declare @strlen BIGINT 
+create table temp_version (value varchar(500))
+insert into temp_version select @@servername
+select @instancename=value from temp_version 
+set @strlen = len (@instancename)
+set @instancename = substring (@instancename,charindex('\',ltrim(rtrim(@instancename)))+1,len(@instancename))
+drop table temp_version
+---------------------------------------
+-- Find the database mail profile name
+---------------------------------------
+SELECT @IsDBMailEnabled = CONVERT(BIGINT, ISNULL(value, value_in_use)) 
+FROM  sys.configurations
+WHERE name LIKE 'Database Mail XPs'
+IF @IsDBMailEnabled = 0
+	RAISERROR('Warning: Database mail is disabled. Database mail is required to send out reports', 12, 1)
+ELSE
+BEGIN
+DECLARE @MailProfile VARCHAR(256)
+		create table #dbmail_profile
+		(profileid BIGINT null, profilename varchar(125) null,	accountid BIGINT null,	accountname varchar(125) null, sequencenumber BIGINT null)
+		insert #dbmail_profile 	EXECUTE msdb.dbo.sysmail_help_profileaccount_sp;
+		select @MailProfile = profilename from #dbmail_profile	where sequencenumber = 1
+		drop table #dbmail_profile
+declare @MailSubject VARCHAR(100)
+SELECT @MailSubject = 'SQL Server Index Report Overview: ' + CONVERT(VARCHAR(50),@@servername)
+declare @temp nvarchar (200), @attachment nvarchar (512)
+set @attachment = 'C:\Reports'
+select @temp = @attachment +'\'+@instancename+'_ProdIndexReport.html'
+
+-----------------------------------------
+-- Index Fragmentation Report 
+-----------------------------------------
+if exists (select * from tempdb..sysobjects where name = '#Index_Fragmentation_Info')
+DROP TABLE #Index_Fragmentation_Info
+create TABLE #Index_Fragmentation_Info
+([DatabaseName] varchar (1024) ,	[SchemaName] varchar (1024) ,
+	[TableName] varchar (1024) ,	[indexName] varchar (1024) ,
+	[IndexType] varchar (1024) ,	[PageCount]	BIGINT,
+	[TotalSpaceMB] BIGINT, [UsedSpaceMB] BIGINT, [UnusedSpaceMB] BIGINT,
+	[avg_fragmentation_percent]		float NULL)
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#temp3'))
+DROP TABLE #temp3
+CREATE TABLE #temp3
+([DatabaseName] varchar (1024) ,	[SchemaName] varchar (1024) ,
+	[TableName]	varchar (1024) ,	[indexName] varchar (1024) ,
+	[IndexType] varchar (1024) ,	[PageCount]	BIGINT,
+	[TotalSpaceMB] BIGINT, [UsedSpaceMB] BIGINT, [UnusedSpaceMB] BIGINT,
+	[avg_fragmentation_percent]	float NULL)
+ 
+declare dbcursor CURSOR for 
+	select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+	 
+OPEN dbcursor
+FETCH NEXT FROM dbcursor
+into @dbname
+ 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	set @sqlQuery =  'USE  [' + @dbname + '];INSERT INTO #temp3
+SELECT Top 20
+DB_NAME() AS DatabaseName,
+dbschemas.[name] as ''Schema'', 
+dbtables.[name] as ''Table'', 
+dbindexes.[name] as ''Index'',
+indexstats.index_type_desc ,
+indexstats.page_count ,
+--Cast((indexstats.page_count * 8)/1024. as decimal(12,2)) as size_in_mb,
+SUM(CONVERT(BIGINT,a.total_pages)) * 8 /1024 AS TotalSpaceMB, 
+SUM(CONVERT(BIGINT,a.used_pages)) * 8 /1024 AS UsedSpaceMB, 
+(SUM(CONVERT(BIGINT,a.total_pages)) - SUM(CONVERT(BIGINT,a.used_pages))) * 8 /1024 AS UnusedSpaceMB,
+indexstats.avg_fragmentation_in_percent
+        
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL, NULL, NULL) AS indexstats
+INNER JOIN sys.tables dbtables on dbtables.[object_id] = indexstats.[object_id]
+INNER JOIN sys.schemas dbschemas on dbtables.[schema_id] = dbschemas.[schema_id]
+INNER JOIN sys.indexes AS dbindexes ON dbindexes.[object_id] = indexstats.[object_id] AND indexstats.index_id = dbindexes.index_id
+INNER JOIN sys.partitions p ON indexstats.object_id = p.OBJECT_ID AND indexstats.index_id = p.index_id
+INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id
+WHERE indexstats.database_id = DB_ID() and indexstats.page_count>1000
+GROUP BY 
+    dbtables.[name] , dbschemas.[name] , dbindexes.[name] , indexstats.index_type_desc , indexstats.avg_fragmentation_in_percent, indexstats.page_count
+ORDER BY indexstats.avg_fragmentation_in_percent desc 
+'
+
+exec sp_executesql @sqlQuery  
+ 
+FETCH NEXT FROM dbcursor
+into @dbname
+END
+ 
+CLOSE dbcursor
+Deallocate dbcursor 
+
+insert into #Index_Fragmentation_Info
+select  * from  #temp3 order by DatabaseName, [avg_fragmentation_percent] desc
+
+--DECLARE @HTML VARCHAR(MAX) 
+--SET @HTML = ''       
+  
+SELECT @HTML = @HTML +'<FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+      
+'<H3><a name="#Index Fragmentation Report">Index Fragmentation Report</a></H3>
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>             
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">SchemaName</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexName</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexType</FONT></TH>         
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">PageCount</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TotalSpaceMB</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">UsedSpaceMB</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">UnUsedSpaceMB</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">avg_fragmentation_percent</FONT></TH>    
+</TR>'      
+
+
+SELECT     @HTML = @HTML +  
+      
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(DatabaseName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull(SchemaName,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(TableName,0) ))) + '</FONT></TD>'+      
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(IndexName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexType,0) ))) + '</FONT></TD>'+  
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull([PageCount],0) ))) + '</FONT></TD>'+
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull([TotalSpaceMB],0) ))) + '</FONT></TD>'+
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull([UsedSpaceMB],0) ))) + '</FONT></TD>'+
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull([UnusedSpaceMB],0) ))) + '</FONT></TD>'+
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(Avg_Fragmentation_percent,0) ))) + '</FONT></TD>' 
+    
+FROM #Index_Fragmentation_Info order by DatabaseName, [avg_fragmentation_percent] desc
+
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+-----------------------------------------
+--  Un-Used Index Report 
+-----------------------------------------
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#temp4'))
+DROP TABLE #temp4
+CREATE TABLE #temp4
+(DatabaseName varchar (1000),SchemaName varchar (1000)
+,TableName varchar (1000),IndexName varchar (1000)
+,User_Updates BIGINT,User_SeeksScansLookups BIGINT
+,System_Updates BIGINT,System_SeeksScansLookups BIGINT)
+
+
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#UnusedIndexes'))
+DROP TABLE #UnusedIndexes
+CREATE TABLE #UnusedIndexes
+(DatabaseName varchar (1000),SchemaName varchar (1000)
+,TableName varchar (1000),IndexName varchar (1000)
+,User_Updates BIGINT,User_SeeksScansLookups BIGINT
+,System_Updates BIGINT,System_SeeksScansLookups BIGINT  
+,Drop_index_Statement varchar (1000))
+
+ 
+declare dbcursor CURSOR for 
+	select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+ 
+OPEN dbcursor
+FETCH NEXT FROM dbcursor
+into @dbname
+ 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	set @sqlQuery =  'USE   [' + @dbname + '];INSERT INTO #temp4
+SELECT top 20
+	DB_NAME() AS DatabaseName
+	, SCHEMA_NAME(o.Schema_ID) AS SchemaName
+	, OBJECT_NAME(ix_usage_stats.object_id) AS TableName
+	, ix.name AS IndexName
+	, ix_usage_stats.user_updates
+	, ix_usage_stats.user_seeks + ix_usage_stats.user_scans + ix_usage_stats.user_lookups
+							AS [User SeeksScansLookups]
+    , ix_usage_stats.system_updates							
+	, ix_usage_stats.system_seeks + ix_usage_stats.system_scans + ix_usage_stats.system_lookups
+							AS [System SeeksScansLookups]
+FROM sys.dm_db_index_usage_stats ix_usage_stats
+INNER JOIN sys.indexes ix ON ix_usage_stats.object_id = ix.object_id
+	AND ix_usage_stats.index_id = ix.index_id
+INNER JOIN sys.objects o ON ix.object_id = o.object_id
+WHERE ix_usage_stats.database_id = DB_ID()
+	AND ix.name IS NOT NULL -- exclude heaps
+	AND ix.type <> 1 -- exclude the clustered indexes
+	AND o.is_ms_shipped = 0 -- exclude system objects
+	AND o.type NOT IN(''F'', ''UQ'') -- exclude the foreign keys and unique contraints
+	AND ix_usage_stats.user_seeks = 0
+	AND ix_usage_stats.user_scans = 0
+	AND ix_usage_stats.user_lookups = 0
+
+'
+exec sp_executesql @sqlQuery  
+ 
+FETCH NEXT FROM dbcursor
+into @dbname
+END
+ 
+CLOSE dbcursor
+Deallocate dbcursor
+
+
+insert into #UnusedIndexes
+SELECT top 20 uix.DatabaseName
+,uix.SchemaName 
+,uix.TableName
+,uix.IndexName
+,uix.User_Updates
+,uix.User_SeeksScansLookups
+,uix.System_Updates
+,uix.System_SeeksScansLookups
+,'DROP INDEX [' +uix.IndexName+ '] ON [' +uix.DatabaseName+ '].[' +uix.SchemaName+ '].[' +uix.TableName+ ']' as [DROP INDEX Statement]
+FROM #temp4 uix
+--WHere uix.DatabaseName ='EDHQ2P'
+ORDER BY uix.User_Updates desc
+
+
+SELECT @HTML = @HTML +'<FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+      
+'<H3><a name="#Un-Used Index Report">Un-Used Index Report</a></H3>
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>             
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">SchemaName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">User_Updates</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">User_SeeksScansLookups</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">System_Updates</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">System_SeeksScansLookups</FONT></TH>    
+ <TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">Drop_Index_Statement</FONT></TH>    
+</TR>'  
+
+SELECT     @HTML = @HTML +  
+      
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(DatabaseName,0) ))) + 
+
+'</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull(SchemaName,0) ))) + 
+
+'</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(TableName,0) ))) + 
+
+'</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexName,0) ))) + 
+
+'</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(User_Updates,0) ))) + 
+
+'</FONT></TD>'+      
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(User_SeeksScansLookups,0) ))) +
+'</FONT></TD>'+       
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(System_Updates,0) ))) +
+'</FONT></TD>' + 
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(System_SeeksScansLookups,0) ))) + 
+'</FONT></TD>' 
+ + 
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(Drop_Index_Statement,0) ))) + 
+'</FONT></TD>' 
+
+FROM #UnusedIndexes
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+
+
+-----------------------------------------
+--  Duplicate Index Report 
+-----------------------------------------
+DECLARE  @First				[smallint]
+		,@Last				[smallint]
+		,@SQLServer			[nvarchar] (1024)
+		,@StringToExecuteP1	[nvarchar] (max)
+		,@StringToExecuteP2	[nvarchar] (max)
+		,@StringToExecuteP3	[nvarchar] (max)
+		
+
+IF NOT EXISTS (SELECT *
+			   FROM [tempdb].[sys].[objects]
+			   WHERE [name] = 'DUPLICATE_INDEXES_INFO'
+				AND [type] IN (N'U'))
+
+
+BEGIN
+	CREATE TABLE [tempdb].[dbo].[DUPLICATE_INDEXES_INFO]
+		([Database]				[nvarchar](1024)
+	    ,[TableName]			[varchar](1024)
+	    ,[IndexName]			[varchar](1024)
+	    ,[IndexType]			[varchar](13)
+	    ,[KeyColumns]			[varchar](1024)
+	    ,[NonKeyColumns]		[varchar](1024)
+	    ,[KeyColumnsOrder]		[varchar](1024)
+	    ,[NonKeyColumnsOrder]	[varchar](1024)
+	    ,[IsUnique]				[char](1)
+	    ,[HasNonKeyColumns]		[char](1))
+		
+END
+ELSE
+BEGIN
+	TRUNCATE TABLE [tempdb].[dbo].[DUPLICATE_INDEXES_INFO]
+END
+
+IF OBJECT_ID('Tempdb.dbo.#Indexes') IS NOT NULL
+	DROP TABLE #Indexes
+CREATE TABLE #Indexes  
+	([RowNo] [smallint] IDENTITY(1, 1)
+	,[TableName] [varchar](1024)
+	,[IndexName] [varchar](152)
+	,[IsUnique] [smallint]
+	,[IndexType] [varchar](13))
+					   
+IF OBJECT_ID('Tempdb.dbo.#AllIndexesInfo') IS NOT NULL
+	DROP TABLE #AllIndexesInfo
+CREATE TABLE #AllIndexesInfo
+	([ObjectID]			[BIGINT] NOT NULL
+	,[TableName]		[nvarchar](1024) NULL
+	,[IndexID]			[BIGINT] NOT NULL
+	,[IndexName]		[sysname] NULL
+	,[IndexType]		[varchar](13) NOT NULL
+	,[ColumnID]			[BIGINT] NOT NULL
+	,[ColumnName]		[sysname] NULL
+	,[IncludedColumns]	[bit] NULL
+	,[IsUnique]			[bit] NULL)
+
+IF OBJECT_ID('Tempdb.dbo.#AllIndexesDetailedInfo') IS NOT NULL
+	DROP TABLE #AllIndexesDetailedInfo					
+CREATE TABLE #AllIndexesDetailedInfo
+	([TableName]			[varchar](1024)
+	,[IndexName]			[varchar](1024)
+	,[IndexType]			[varchar](100)
+	,[KeyColumns]			[varchar](1024)
+	,[NonKeyColumns]		[varchar](1024)
+	,[KeyColumnsOrder]		[varchar](1024)
+	,[NonKeyColumnsOrder]	[varchar](1024)
+	,[IsUnique]				[char](1)
+	,[HasNonKeyColumns]		[char](1))
+								    
+DECLARE @DatabaseList TABLE ([RowNo]  [smallint] identity (1, 1)
+							,[DBName] [varchar](1024))
+
+SELECT @SQLServer = CAST(SERVERPROPERTY('ServerName') AS [nvarchar](256))
+
+INSERT INTO @DatabaseList 
+select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+
+
+SELECT @First = MIN([RowNo]) FROM @DatabaseList
+SELECT @Last = MAX([RowNo]) FROM @DatabaseList
+
+WHILE @First <= @Last
+BEGIN
+	SELECT @DBName = [DBName] 
+	FROM @DatabaseList WHERE [RowNo] = @First
+
+	SET @StringToExecuteP1 = 'USE [' + @DBName + '];
+		INSERT INTO #AllIndexesInfo
+				   ([ObjectID]
+				   ,[TableName]
+				   ,[IndexID]
+				   ,[IndexName]
+				   ,[IndexType]
+				   ,[ColumnID]
+				   ,[ColumnName]
+				   ,[IncludedColumns]
+				   ,[IsUnique])
+		SELECT o.[object_id] AS [ObjectID]
+			  ,sc.Name + ''.'' + OBJECT_NAME(o.[object_id]) AS [TableName]
+			  ,i.[index_id] AS [IndexID]
+			  ,i.[name] AS [IndexName]
+			  ,CASE i.[type]
+				WHEN 0
+					THEN ''Heap''
+				WHEN 1
+					THEN ''Clustered''
+				WHEN 2
+					THEN ''Non-Clustered''
+				WHEN 3
+					THEN ''XML''
+				ELSE ''Unknown''
+				END AS [IndexType]
+			,ic.[column_id] AS [ColumnID]
+			,c.[name] AS [ColumnName]
+			,ic.[is_included_column] [IncludedColumns]
+			,i.[is_unique] AS [IsUnique]
+		FROM [' + @DBName + '].[sys].[indexes] i
+		INNER JOIN [' + @DBName + '].[sys].[objects] o 
+			ON i.[object_id] = o.[object_id]
+				AND o.[type] = ''U''
+				AND i.[index_id] > 0
+				 INNER JOIN [' + @DBName + '].[sys].[schemas] sc  on o.Schema_Id = sc.Schema_ID
+		INNER JOIN [' + @DBName + '].[sys].[index_columns] ic 
+			ON i.[index_id] = ic.[index_id]
+				AND i.[object_id] = ic.[object_id]
+		INNER JOIN [' + @DBName + '].[sys].[columns] c 
+			ON c.[column_id] = ic.[column_id]
+				AND c.[object_id] = ic.[object_id]
+			
+		INSERT INTO #Indexes
+		SELECT DISTINCT [TableName]
+			,[IndexName]
+			,[IsUnique]
+			,[IndexType]
+		FROM #AllIndexesInfo'
+
+	EXEC (@StringToExecuteP1)
+
+	SET @StringToExecuteP2 = 'USE [' + @DBName + '];
+		DECLARE @First				[smallint]
+			   ,@Last				[smallint]
+			   ,@IsUnique			[smallint]
+			   ,@HasNonKeyCols		[char] (1)
+			   ,@TableName			[varchar] (256)
+			   ,@IndexName			[varchar] (256)
+			   ,@IndexType			[varchar] (13)
+			   ,@IndexColumns		[varchar] (1000)
+			   ,@IncludedColumns	[varchar] (1000)
+			   ,@IndexColsOrder		[varchar] (1000)
+			   ,@IncludedColsOrder  [varchar] (1000)
+
+		SELECT @First = MIN([RowNo])
+		FROM #Indexes
+
+		SELECT @Last = MAX([RowNo])
+		FROM #Indexes
+
+		WHILE @First <= @Last
+		BEGIN
+			SET @IndexColumns = NULL
+			SET @IncludedColumns = NULL
+			SET @IncludedColsOrder = NULL
+			SET @IndexColsOrder = NULL
+
+			SELECT @TableName = [TableName]
+				  ,@IndexName = [IndexName]
+				  ,@IsUnique  = [IsUnique]
+				  ,@IndexType = [IndexType]
+			FROM #Indexes
+			WHERE [RowNo] = @First
+
+			SELECT @IndexColumns = COALESCE(@IndexColumns + '', '', '''') 
+										+ [ColumnName]
+			FROM #AllIndexesInfo
+			WHERE [TableName] = @TableName
+				AND [IndexName] = @IndexName
+				AND [IncludedColumns] = 0
+			ORDER BY [IndexName]
+					,[ColumnName]
+
+			SELECT @IncludedColumns = COALESCE(@IncludedColumns + '', '', '''') 
+										+ [ColumnName]
+			FROM #AllIndexesInfo
+			WHERE [TableName] = @TableName
+				AND [IndexName] = @IndexName
+				AND [IncludedColumns] = 1
+			ORDER BY [IndexName]
+					,[ColumnName]
+
+			SELECT @IndexColsOrder = COALESCE(@IndexColsOrder + '', '', '''') 
+										+ [ColumnName]
+			FROM #AllIndexesInfo
+			WHERE [TableName] = @TableName
+				AND [IndexName] = @IndexName
+				AND [IncludedColumns] = 0
+
+			SELECT @IncludedColsOrder = COALESCE(@IncludedColsOrder + '', '', '''') 
+										+ [ColumnName]
+			FROM #AllIndexesInfo
+			WHERE [TableName] = @TableName
+				AND [IndexName] = @IndexName
+				AND [IncludedColumns] = 1
+
+			SET @HasNonKeyCols = ''N''
+
+			IF @IncludedColumns IS NOT NULL
+			BEGIN
+				SET @HasNonKeyCols = ''Y''
+			END
+
+			INSERT INTO #AllIndexesDetailedInfo (
+				[TableName]
+				,[IndexName]
+				,[IndexType]
+				,[IsUnique]
+				,[KeyColumns]
+				,[KeyColumnsOrder]
+				,[HasNonKeyColumns]
+				,[NonKeyColumns]
+				,[NonKeyColumnsOrder]
+				)
+			SELECT @TableName
+				,@IndexName
+				,@IndexType
+				,CASE @IsUnique
+					WHEN 1
+						THEN ''Y''
+					WHEN 0
+						THEN ''N''
+					END
+				,@IndexColumns
+				,@IndexColsOrder
+				,@HasNonKeyCols
+				,@IncludedColumns
+				,@IncludedColsOrder
+
+			SET @First = @First + 1
+		END'
+
+	EXEC (@StringToExecuteP2)
+
+	SET @StringToExecuteP3 = 'USE [' + @DBName + '];
+	  INSERT INTO [tempdb].[dbo].[DUPLICATE_INDEXES_INFO]
+			   ([Database]
+			   ,[TableName]
+			   ,[IndexName]
+			   ,[IndexType]
+	   		   ,[KeyColumns]
+			   ,[HasNonKeyColumns]
+			   ,[NonKeyColumns]
+			   ,[KeyColumnsOrder]
+			   ,[NonKeyColumnsOrder]
+			   ,[IsUnique])
+		SELECT  ''' + @DBName + '''
+			   ,[TableName]
+			   ,[IndexName]
+			   ,[IndexType]
+	   		   ,[KeyColumns]
+			   ,[HasNonKeyColumns]
+			   ,[NonKeyColumns]
+			   ,[KeyColumnsOrder]
+			   ,[NonKeyColumnsOrder]
+			   ,[IsUnique]
+			   
+		FROM
+		(
+		  SELECT DISTINCT 
+			 a1.[TableName]
+			,a1.[IndexName]
+			,a1.[IndexType]
+			,a1.[KeyColumns]
+			,a1.[HasNonKeyColumns]
+			,a1.[NonKeyColumns]
+			,a1.[KeyColumnsOrder]
+			,a1.[NonKeyColumnsOrder]
+			,a1.[IsUnique]
+		  FROM #AllIndexesDetailedInfo a1
+		  INNER JOIN #AllIndexesDetailedInfo a2 
+			ON a1.[TableName] = a2.TableName
+			 AND a1.[IndexName] <> a2.[IndexName]
+			 AND a1.[KeyColumns] = a2.[KeyColumns]
+			 AND ISNULL(a1.[NonKeyColumns], '''') = ISNULL(a2.[NonKeyColumns], '''')
+		  WHERE a1.[IndexType] <> ''XML''
+		 ) a '
+
+	EXEC (@StringToExecuteP3)
+	
+	TRUNCATE TABLE #Indexes
+	TRUNCATE TABLE #AllIndexesInfo
+	TRUNCATE TABLE #AllIndexesDetailedInfo
+	
+	SET @First = @First + 1 
+END
+
+--SELECT  [Server]
+--      ,[Database]
+--      ,[TableName]
+--      ,[IndexName]
+--      ,[IndexType]
+--      ,[KeyColumns]
+--      ,[NonKeyColumns]
+--      ,[KeyColumnsOrder]
+--      ,[NonKeyColumnsOrder]
+--      ,[IsUnique]
+--      ,[HasNonKeyColumns]
+--      ,[CheckDate]
+--FROM [tempdb].[dbo].[DUPLICATE_INDEXES_INFO]
+
+SET @HTML = @HTML + '      
+<FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+      
+'<H3><a name="#Duplicate Index Report">Duplicate Index Report</a></H3>
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>             
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">Database</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexType</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">KeyColumns</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">NonKeyColumns</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">KeyColumnsOrder</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">NonKeyColumnsOrder</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IsUnique</FONT></TH>    
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">HasNonKeyColumns</FONT></TH>    
+</TR>'      
+      
+SELECT   @HTML = @HTML +  
+      
+'<TR><TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull([Database],0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(TableName,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexType,0) ))) + '</FONT></TD>'+      
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(KeyColumns,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(NonKeyColumns,0) ))) + '</FONT></TD>' + 
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(KeyColumnsOrder,0) ))) + '</FONT></TD>'    + 
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(NonKeyColumnsOrder,0) ))) + '</FONT></TD>'+
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IsUnique,0) ))) +  '</FONT></TD>' + 
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(HasNonKeyColumns,0) ))) + '</FONT></TD>' 
+   
+
+FROM [tempdb].[dbo].[DUPLICATE_INDEXES_INFO]
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+
+-----------------------------------------
+--  Missing Index Report 
+-----------------------------------------
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#Missing_Index_Info'))
+DROP TABLE #Missing_Index_Info
+
+SELECT top 20 
+--CAST(SERVERPROPERTY('ServerName') AS [nvarchar](256)) AS [SQLServer],
+    db.[name] AS [DatabaseName]
+    ,id.[object_id] AS [ObjectID]
+    ,id.[statement] AS [FullyQualifiedObjectName]
+    ,id.[included_columns] AS [IncludedColumns]
+    ,gs.[user_seeks] AS [UserSeeks]
+    ,gs.[user_scans] AS [UserScans]
+    ,gs.[user_seeks] * gs.[avg_total_user_cost] * (gs.[avg_user_impact] * 0.01) AS [IndexAdvantage]
+    ,'CREATE INDEX [Missing_IXNC_' + OBJECT_NAME(id.[object_id], db.[database_id]) + '_' + REPLACE(REPLACE(REPLACE(ISNULL(id.[equality_columns], ''), ', ', '_'), '[', ''), ']', '') + CASE
+        WHEN id.[equality_columns] IS NOT NULL
+            AND id.[inequality_columns] IS NOT NULL
+            THEN '_'
+        ELSE ''
+        END + REPLACE(REPLACE(REPLACE(ISNULL(id.[inequality_columns], ''), ', ', '_'), '[', ''), ']', '') + '_' + LEFT(CAST(NEWID() AS [nvarchar](64)), 5) + ']' + ' ON ' + id.[statement] + ' (' + ISNULL(id.[equality_columns], '') + CASE
+        WHEN id.[equality_columns] IS NOT NULL
+            AND id.[inequality_columns] IS NOT NULL
+            THEN ','
+        ELSE ''
+        END + ISNULL(id.[inequality_columns], '') + ')' + ISNULL(' INCLUDE (' + id.[included_columns] + ')', '') AS [ProposedIndex]
+Into #Missing_Index_Info
+FROM [sys].[dm_db_missing_index_group_stats] gs WITH (NOLOCK)
+INNER JOIN [sys].[dm_db_missing_index_groups] ig WITH (NOLOCK)
+    ON gs.[group_handle] = ig.[index_group_handle]
+INNER JOIN [sys].[dm_db_missing_index_details] id WITH (NOLOCK)
+    ON ig.[index_handle] = id.[index_handle]
+INNER JOIN sys.databases db WITH (NOLOCK)  ON db.[database_id] = id.[database_id]
+	WHERE  [state_desc] = 'ONLINE' 
+AND db.[database_id] > 4  and  is_read_only <> 1 and  name not in ('distribution', 'REPORT_SERVERTempDB', 'ReportServerTempDB') 
+ORDER BY [IndexAdvantage] DESC
+OPTION (RECOMPILE);
+
+SET @HTML = @HTML + ' <FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+     
+'<H3><a name="#Missing Index Report">Missing Index Report</a></H3>      
+<TABLE BORDER = 2 CELLPADDING = 5 WIDTH=100%>             
+<TR BGCOLOR = LIGHTBLUE>      
+    
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">ObjectID</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">FullyQualifiedObjectName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IncludedColumns</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">UserSeeks</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">UserScans</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexAdvantage</FONT></TH>    
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">ProposedIndex</FONT></TH>    
+</TR>' 
+      
+SELECT     @HTML = @HTML +  
+      
+	     
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull([DatabaseName],0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(ObjectID,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(FullyQualifiedObjectName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IncludedColumns,0) ))) + '</FONT></TD>'+      
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(UserSeeks,0) ))) +
+'</FONT></TD>'+       
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(UserScans,0) ))) +
+'</FONT></TD>' + 
+'<TD VALIGN="TOP NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexAdvantage,0) ))) + 
+'</FONT></TD>'    + 
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(ProposedIndex,0) ))) + '</FONT></TD>' 
+    
+FROM #Missing_Index_Info
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+-----------------------------------------
+--  Heap - Tables Report 
+-----------------------------------------
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#Heap_Table_Info'))
+DROP TABLE #Heap_Table_Info
+CREATE TABLE #Heap_Table_Info(DatabaseName SYSNAME, TableName SYSNAME )
+
+declare dbcursor CURSOR for 
+select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+ 
+OPEN dbcursor
+FETCH NEXT FROM dbcursor
+into @dbname
+ 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	set @sqlQuery =  'USE   [' + @dbname + '];INSERT #Heap_Table_Info SELECT top 20 db_name(),T.Name ''HEAP TABLE''
+FROM sys.indexes I      
+    INNER JOIN sys.tables T 
+        ON I.object_id = T.object_id 
+WHERE I.type = 0 AND T.type = ''U''
+'
+
+exec sp_executesql @sqlQuery  
+ 
+FETCH NEXT FROM dbcursor
+into @dbname
+END
+ 
+
+CLOSE dbcursor
+Deallocate dbcursor
+
+SELECT @HTML = @HTML + ' <FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+      
+'<H3><a name="#Heap - Tables Report">Heap - Tables Report</a></H3>
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=50%>       
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH>              
+</TR>'    
+   
+      
+SELECT     @HTML = @HTML +  
+      
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(DatabaseName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull(TableName,0) ))) + '</FONT></TD>'+       
+'</FONT></TD>'
+    
+FROM #Heap_Table_Info
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+
+--Select @HTML
+--END
+-----------------------------------------
+-- User Read Index Report 
+-----------------------------------------
+
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#Index_Read_Info'))
+DROP TABLE #Index_Read_Info
+create table #Index_Read_Info
+(DatabaseName varchar(max),Tablename varchar(max),
+Indexname varchar(max),IndexType varchar (max),
+UserRead BIGINT)
+
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#Temp1'))
+DROP TABLE #Temp1
+create table #Temp1
+(DatabaseName varchar(max),Tablename varchar(max),
+Indexname varchar(max),IndexType varchar (max),
+UserRead BIGINT)
+ 
+declare dbcursor CURSOR for 
+select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+ 
+OPEN dbcursor
+FETCH NEXT FROM dbcursor
+into @dbname
+ 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	set @sqlQuery =  'USE   [' + @dbname + '];insert into #Temp1
+SELECT top 20 DB_NAME() AS DatabaseName,
+object_name(s.object_id)as tablename,
+i.name as indexname,
+i.type_desc as Indextype,
+s.user_seeks + s.user_scans + s.user_lookups AS [UserRead]
+
+FROM sys.dm_db_index_usage_stats AS s
+INNER JOIN sys.indexes AS i
+ON s.object_id = i.object_id
+AND i.index_id = s.index_id
+WHERE objectproperty(s.object_id,''IsUserTable'') = 1 
+order by UserRead desc 
+'
+exec sp_executesql @sqlQuery  
+ 
+FETCH NEXT FROM dbcursor
+into @dbname
+END
+ 
+CLOSE dbcursor
+Deallocate dbcursor
+
+
+insert into #Index_Read_Info 
+select * from #Temp1
+
+     
+SET @HTML = @HTML + '<FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+     
+'<H3><a name="#User Read Index Report">User Read Index Report</a></H3>      
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>       
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>    
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexName</FONT></TH>   
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexType</FONT></TH>     
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">UserReads</FONT></TH>       
+</TR>' 
+      
+SELECT  @HTML = @HTML +  
+       
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(DatabaseName,0) ))) + '</FONT></TD>'+     
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull(TableName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(IndexName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexType,0) ))) + '</FONT></TD>'+  
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(UserRead,0) ))) + '</FONT></TD>'
+    
+FROM #Index_Read_Info
+
+SELECT @HTML = @HTML + ' </TABLE>'
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+
+-----------------------------------------
+-- User Write Index Report 
+-----------------------------------------
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#Index_Write_Info'))
+DROP TABLE #Index_Write_Info
+create table #Index_Write_Info
+(DatabaseName varchar(256),Tablename varchar(256),
+Indexname varchar(256),IndexType varchar (256),
+UserWrites varchar (256))
+
+
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#Temp2'))
+DROP TABLE #Temp2
+create table #Temp2
+(DatabaseName varchar(256),Tablename varchar(256),
+Indexname varchar(256),IndexType varchar (256),UserWrites varchar (256))
+
+ 
+declare dbcursor CURSOR for 
+select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+ 
+OPEN dbcursor
+FETCH NEXT FROM dbcursor
+into @dbname
+ 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	set @sqlQuery =  'USE   [' + @dbname + '];insert into #temp2
+SELECT top 20 DB_NAME() AS DatabaseName,
+object_name(s.object_id)as tablename,
+i.name as indexname,
+i.type_desc as Indextype,
+s.user_updates as Writes
+FROM sys.dm_db_index_usage_stats AS s
+INNER JOIN sys.indexes AS i
+ON s.object_id = i.object_id
+AND i.index_id = s.index_id
+WHERE objectproperty(s.object_id,''IsUserTable'') = 1 
+order by Writes desc
+
+'
+exec sp_executesql @sqlQuery  
+ 
+FETCH NEXT FROM dbcursor
+into @dbname
+END
+ 
+CLOSE dbcursor
+Deallocate dbcursor
+
+
+insert into #Index_Write_Info
+select * from #temp2 
+
+SET @HTML = @HTML + '<FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+      
+'<H3><a name="#User Write Index Report">User Write Index Report</a></H3>      
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>       
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>    
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH>       
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexName</FONT></TH>   
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexType</FONT></TH>     
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">UserWrites</FONT></TH>       
+</TR>' 
+
+SELECT     @HTML = @HTML +  
+       
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(DatabaseName,0) ))) + '</FONT></TD>'+     
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull(TableName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(IndexName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IndexType,0) ))) + '</FONT></TD>'+  
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(UserWrites,0) ))) + '</FONT></TD>'
+    
+FROM #Index_Write_Info
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + ' </BODY></HTML>'
+
+-----------------------------------------
+-- Statistics Update Info
+-----------------------------------------
+
+create TABLE #Stats_Update_Info
+([DatabaseName] varchar (1024) ,	[TableName] varchar (1024) ,	
+[IndexName] varchar (1024) , [TableRows] BIGINT, [Total_Space_In_MB] BIGINT, [Last_User_Update] Datetime,
+StatsUpdated Datetime, IsStatsCreatedByQueryProcessor varchar(5),
+IsStatsCreatedByUser varchar(5), IsStatsCreatedWithNoReComputeOption varchar(5))
+
+if exists (select [id] from sysobjects where [id] = OBJECT_ID ('#temp5'))
+DROP TABLE #temp5
+CREATE TABLE #temp5
+([DatabaseName] varchar (1024) ,	[TableName] varchar (1024) ,	
+[IndexName] varchar (1024) , [TableRows] BIGINT, [Total_Space_In_MB] BIGINT, [Last_User_Update] Datetime,
+StatsUpdated Datetime, IsStatsCreatedByQueryProcessor varchar(5),
+IsStatsCreatedByUser varchar(5), IsStatsCreatedWithNoReComputeOption varchar(5))
+ 
+declare dbcursor CURSOR for 
+select name from sys.databases WITH (NOLOCK) where database_id >4 and state_desc = 'ONLINE' and  is_read_only <> 1 and  name not in ('distribution', 'ReportServer', 'ReportServerTempDB') order by name
+
+OPEN dbcursor
+FETCH NEXT FROM dbcursor
+into @dbname
+ 
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	set @sqlQuery =  'USE   [' + @dbname + '];INSERT INTO #temp5
+select DB_NAME() AS DatabaseName, sysobj.name AS ObjectName,
+sysindex.name AS IndexName,
+part.rows AS [TableRows],
+ CAST((SUM(DISTINCT au.Total_pages) * 8 ) / 1024.000 AS NUMERIC(18, 3))  AS [Total_Space_In_MB],
+sysdius.last_user_update AS [Last_User_Update],
+Stats_date(sysindex.[object_id], sysindex.index_id) AS [Statistics Update Date],
+CASE sysstats.auto_created
+WHEN 0 THEN ''NO''
+WHEN 1 THEN ''YES''
+END AS
+IsStatsCreatedByQueryProcessor,
+CASE sysstats.user_created
+WHEN 0 THEN ''NO''
+WHEN 1 THEN ''YES''
+END AS
+IsStatsCreatedByUser,
+CASE sysstats.no_recompute
+WHEN 0 THEN ''NO''
+WHEN 1 THEN ''YES''
+END AS
+IsStatsCreatedWithNoReComputeOption
+FROM sys.objects AS sysobj WITH (nolock)
+INNER JOIN sys.indexes AS sysindex WITH (nolock)
+ON sysobj.[object_id] = sysindex.[object_id]
+INNER JOIN sys.stats AS sysstats WITH (nolock)
+ON sysindex.[object_id] = sysstats.[object_id]
+AND sysindex.index_id = sysstats.stats_id
+INNER JOIN sys.dm_db_index_usage_stats AS sysdius WITH (nolock)
+ON sysdius.[object_id] = sysindex.[object_id]
+INNER JOIN SYS.Partitions part ON sysindex.Object_id = part.Object_id AND sysindex.Index_id = part.Index_id
+INNER JOIN SYS.Allocation_units au ON part.Partition_id = au.Container_id
+WHERE sysobj.[type] IN ( ''U'', ''V'' ) and STATS_DATE(sysindex.[object_id], sysindex.index_id)<=DATEADD(HOUR,- '+CAST( (@hours) AS VARCHAR) +',GETDATE()) 
+GROUP BY sysobj.name , sysindex.name , sysdius.last_user_update , sysindex.[object_id], sysindex.[index_id] , part.rows
+,sysstats.auto_created , sysstats.user_created, sysstats.no_recompute
+ORDER BY Stats_date(sysindex.[object_id], sysindex.index_id)
+'
+--print @sqlQuery  
+exec sp_executesql @sqlQuery  
+ 
+FETCH NEXT FROM dbcursor
+into @dbname
+END
+ 
+CLOSE dbcursor
+Deallocate dbcursor 
+
+insert into #Stats_Update_Info
+select  * from  #temp5 order by DatabaseName, StatsUpdated desc
+
+SET @HTML = @HTML + '<FONT FACE="CALIBRI" SIZE=3> <BR>'+CHAR(13)+      
+'<H3><a name="#Statistics Update Report">Statistics Update Report</a></H3>      
+<TABLE BORDER = 2 CELLPADDING =5 WIDTH=100%>             
+<TR BGCOLOR = LIGHTBLUE>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">DatabaseName</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableName</FONT></TH>      
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IndexName</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">TableRows</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">Table_Space_In_MB</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">Last_User_Update</FONT></TH> 
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">StatisticsUpdated</FONT></TH>         
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IsStatsCreatedByQueryProcessor</FONT></TH>
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IsStatsCreatedByUser</FONT></TH>    
+<TH NOWRAP><FONT SIZE=2 FACE="CALIBRI">IsStatsCreatedWithNoReComputeOption</FONT></TH>    
+</TR>'      
+
+
+SELECT     @HTML = @HTML +  
+      
+'<TR> <TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,isnull(DatabaseName,0) ))) + '</FONT></TD>'+       
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(TableName,0) ))) + '</FONT></TD>'+      
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(IndexName,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(TableRows,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(Total_Space_In_MB,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR(max),IsNull(Last_User_Update,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">'+ LTRIM(RTRIM(CONVERT(VARCHAR,isnull(StatsUpdated,0) ))) + '</FONT></TD>'+ 
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IsStatsCreatedByQueryProcessor,0) ))) + '</FONT></TD>'+  
+'<TD VALIGN="TOP" NOWRAP><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IsStatsCreatedByUser,0) ))) + '</FONT></TD>'+
+'<TD VALIGN="TOP"><FONT SIZE=2 FACE="CALIBRI">' + LTRIM(RTRIM(CONVERT(VARCHAR,IsNull(IsStatsCreatedWithNoReComputeOption,0) ))) + '</FONT></TD>' 
+    
+FROM #Stats_Update_Info order by DatabaseName, StatsUpdated desc
+
+SELECT @HTML = @HTML + ' </TABLE>'
+
+SELECT @HTML = @HTML + '
+ 
+ <a href="#" id="scroll" style="display: none;"><span></span></a>
+
+</BODY></HTML>'
+
+
+Declare @string varchar(max)
+set @string  = @HTML
+
+
+create table master..temptable
+(value varchar(max))
+
+insert into master..temptable select @string
+
+BEGIN 		
+IF EXISTS(SELECT name AS [Configuration], CONVERT(BIGINT, ISNULL(value, value_in_use)) AS [IsEnabled]
+		FROM  master.sys.configurations
+		WHERE  name = 'xp_cmdshell' and value_in_use = 1)
+BEGIN -- get info by xp_cmd_shell if this option is enabled
+
+set @bcpCommand = 'master..xp_cmdshell ' + ''''+'bcp "select value from master..temptable" queryout '  +  @temp +  ' -S'+@@SERVERNAME+' -c -t -T'+''''  
+--print  (@bcpCommand)  
+exec  (@bcpCommand)  
+
+End
+Else
+Begin
+DECLARE @cmdshell BIT
+	DECLARE @IsShowAdvancedOptions BIT
+	
+	-- check if enabled 'show advanced options', if no enable it
+	SELECT @IsShowAdvancedOptions = CONVERT(BIGINT, ISNULL(value, value_in_use))
+	FROM  sys.configurations
+	WHERE  name = 'show advanced options'	
+	IF @IsShowAdvancedOptions = 0
+	BEGIN
+		EXEC sp_configure 'show advanced options', 1;
+		RECONFIGURE;
+	END
+
+	-- check if enabled 'xp_cmdshell', if no enable it
+	SELECT @cmdshell = CONVERT(BIGINT, ISNULL(value, value_in_use)) 
+	FROM  sys.configurations
+	WHERE  name = 'xp_cmdshell' ;
+	IF @cmdshell = 0
+	BEGIN
+		EXEC sp_configure 'xp_cmdshell', 1;
+		RECONFIGURE;
+	END
+
+--DECLARE @bcpCommand VARCHAR(8000)
+set @bcpCommand = 'master..xp_cmdshell ' + ''''+'bcp "select value from master..temptable" queryout '  +  @temp +  ' -S'+@@SERVERNAME+' -c -t -T'+''''  
+--print  (@bcpCommand)  
+exec (@bcpCommand)  
+
+BEGIN
+		EXEC sp_configure 'xp_cmdshell', 0;
+		RECONFIGURE;
+	END
+
+
+END
+
+End
+
+declare @recipients varchar(256)  
+set @recipients = 'musicandra@gmail.com;musicandra@gmail.com'
+
+--declare @instancename varchar (200)
+--DECLARE @MailProfile VARCHAR(256)
+--		create table #dbmail_profile
+--		(profileid BIGINT null, profilename varchar(125) null,	accountid BIGINT null,	accountname varchar(125) null, sequencenumber BIGINT null)
+--		insert #dbmail_profile 	EXECUTE msdb.dbo.sysmail_help_profileaccount_sp;
+--		select @MailProfile = profilename from #dbmail_profile	where sequencenumber = 1
+--		drop table #dbmail_profile
+--declare @MailSubject VARCHAR(100)
+--SELECT @MailSubject = 'SQL Server Index Report Overview: ' + CONVERT(VARCHAR(50),@@servername)
+--declare @temp nvarchar (200), @attachment nvarchar (512)
+--set @attachment = 'C:\Reports'
+--select @temp = @attachment +'\'+@instancename+'_ProdIndexReport.html'
+
+
+EXEC msdb.dbo.sp_send_dbmail 
+ @profile_name = outlook    
+,@recipients = @recipients    
+,@Body = 'Hello Team, <BR> Please find attached Index Report .html file.<BR><BR> ThankYou, <BR> COMPANYNAME'
+,@file_attachments= @temp
+,@Subject = @MailSubject
+,@body_format = 'HTML'
+
+drop table #Index_Fragmentation_Info
+drop table #temp3
+drop table #Stats_Update_Info
+drop table #temp5 
+drop table #Index_Write_Info
+drop table #temp2
+drop table #Index_Read_Info
+drop table #temp1
+drop table #Heap_Table_Info
+drop table #UnusedIndexes
+drop table #temp4
+--drop table DUPLICATE_INDEXES_INFO
+drop table #AllIndexesDetailedInfo
+drop table #AllIndexesInfo
+drop table #Indexes
+drop table #Missing_Index_Info
+drop table master..temptable
+END
+GO
+
+

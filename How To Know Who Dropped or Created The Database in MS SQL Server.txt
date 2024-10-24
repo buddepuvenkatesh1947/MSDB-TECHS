@@ -1,0 +1,43 @@
+CREATE TABLE LogTable 
+(
+    EventID INT IDENTITY(1,1) PRIMARY KEY,
+    EventType VARCHAR(50) NOT NULL,
+ DatabaseName varchar(50),
+    EventTime DATETIME NOT NULL,
+    EventUser SYSNAME NOT NULL,
+)
+Script:
+--======================
+CREATE TRIGGER log_db_changes
+ON ALL SERVER
+FOR CREATE_DATABASE, DROP_DATABASE
+AS
+BEGIN
+    DECLARE @user sysname,
+ @date datetime,
+ @dbname nvarchar(128),
+ @event_type nvarchar(50);
+    SET @user = SUSER_NAME();
+    SET @date = GETDATE();
+    SET @dbname = EVENTDATA().value('(/EVENT_INSTANCE/DatabaseName)[1]', 'nvarchar(128)');
+    
+    IF EVENTDATA().value('(/EVENT_INSTANCE/EventType)[1]', 'nvarchar(128)') = 'DROP_DATABASE'
+        SET @event_type = 'Database Drop';
+    ELSE
+        SET @event_type = 'Database Create';
+    
+    INSERT INTO LogTable (EventType, EventTime, EventUser, DatabaseName)
+    VALUES (@event_type, @date, @user, @dbname);
+END;
+
+
+select * from LogTable
+
+
+--Limitations:Its doesnt records events for the Rename & Restore.
+
+--Cleanup:
+Drop TRIGGER log_db_changes
+ON ALL SERVER
+
+Drop Table LogTable

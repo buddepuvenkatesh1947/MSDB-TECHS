@@ -1,0 +1,14 @@
+scrpits:
+select sys.databases.name as Database_name,sys.master_files.name As Logical_name ,Physical_name,type_desc from
+sys.master_files
+inner join
+sys.databases
+on
+sys.master_files.database_id = sys.databases.database_id
+===============================
+select a.name as Database_name,b.name As Logical_name ,b.Physical_name,b.type_desc from
+sys.master_files b
+inner join
+sys.databases a
+on
+b.database_id = a.database_id

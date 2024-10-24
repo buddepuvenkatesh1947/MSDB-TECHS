@@ -1,0 +1,30 @@
+In SQL Server, both stream aggregate and hash aggregate are types of operators used in query execution plans to perform aggregation operations, like SUM, AVG, COUNT, etc.
+
+Stream Aggregate: This operator performs aggregation in a single pass through the input data. It is suitable when the data is already sorted according to the grouping columns. The stream aggregate operator works by reading each row from the input, updating the aggregate values as necessary, and emitting the final aggregate result when all rows have been processed.
+
+
+Hash Aggregate: Unlike stream aggregate, the hash aggregate operator does not require the input data to be sorted. It first hashes the input rows based on the grouping columns and then aggregates the rows with the same hash value. This makes it suitable for unsorted input data or when the optimizer decides that using a hash aggregate would be more efficient than a stream aggregate.
+
+Both operators have their pros and cons depending on the nature of the data, the size of the dataset, and the specific query being executed. The SQL Server query optimizer determines which aggregation operator to use based on factors such as cardinality estimates, available indexes, and system resources.
+
+==============================
+select * from HumanResources.Employee
+
+
+select JobTitle, count(*) from HumanResources.Employee
+group by JobTitle
+
+create index ix_jobtitle on HumanResources.Employee(jobtitle)
+
+
+select JobTitle, count(*) from HumanResources.Employee
+group by JobTitle
+option (order group)
+go
+
+select JobTitle, count(*) from HumanResources.Employee
+group by JobTitle
+option (hash group)
+
+select concat ('JobTitle', 'JobTitle') from HumanResources.Employee
+

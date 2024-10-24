@@ -1,0 +1,9 @@
+How To Find Table Name From Page ID In SQL SERVER Page Corruptions
+================
+
+select * from [msdb].dbo.[suspect_pages]
+	DBCC TRACEON(3604)
+	GO
+	DBCC PAGE('Test',1,360,3)
+
+	select OBJECT_NAME(901578250)

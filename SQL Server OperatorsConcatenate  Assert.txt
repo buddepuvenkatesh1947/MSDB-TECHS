@@ -1,0 +1,24 @@
+CREATE TABLE SampleTable (
+    ID INT PRIMARY KEY,
+    Name VARCHAR(50),
+    Age INT
+);
+
+select * from SampleTable
+union all
+select * from SampleTable
+
+
+-Step1
+IF OBJECT_ID('Table1') IS NOT NULL 
+  DROP TABLE Table1 
+GO 
+--Step2
+CREATE TABLE Table1(ID Integer, Selected CHAR(1))  
+GO
+--Step3
+ALTER TABLE Table1 ADD CONSTRAINT CK_Selected_Y_N CHECK(Selected IN('Y','N'))  
+GO 
+
+INSERT INTO Table1(ID, Selected) VALUES(1,'Y') 
+GO
