@@ -1,0 +1,1 @@
+https://www.sqlshack.com/improve-sql-server-transaction-log-performance-with-delayed-durability/

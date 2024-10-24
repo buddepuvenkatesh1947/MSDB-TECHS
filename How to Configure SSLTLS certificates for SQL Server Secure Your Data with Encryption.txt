@@ -1,0 +1,74 @@
+Configure MS SQL Server with SSL/TLS
+
+1.	SSL Stands for Secure Sockets Layer and TLS Stands for Transport Layer security.
+2.	Both are protocols used to secure communication between the client and the server by encrypting the data transmitted over the network.
+3.	SSL has been replaced by TLS due to several security vulnerabilities found in SSL versions. The last version of SSL was SSL 3.0 for TLS is TLS 1.3
+Supported TLS versions.
+SQL SERVER VERSIONS	Min: TLS Version	MAX: TLS Version
+SQL Server 2008	TLS 1.0	TLS 1.2
+SQL Server 2012	TLS 1.0	TLS 1.2
+SQL Server 2014	TLS 1.0	TLS 1.2
+SQL Server 2016	TLS 1.0	TLS 1.2
+SQL Server 2017	TLS 1.0	TLS 1.2
+SQL Server 2019	TLS 1.1	TLS 1.3
+SQL Server 2022	TLS 1.1	TLS 1.3
+
+Note: TLS has support is also depends on underlying operating system as well.
+Windows Root Key:
+Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\
+When implementing TLS changes, ensure you involve both the Windows and application teams in the process. Start by testing the changes in a testing environment, using a trial-and-error approach. Document the steps and practices during testing. Once you have refined the process, apply it to the production environment. Before proceeding with implementation, if feasible, take backups of all databases and perform an OS-level backup to be on safe side. 
+Once implemented make sure to connect with SSMS and SQL CMD and ask the application to check the connect and make yourself in the standby until application confirmation.
+NET Framework 4.6.2 and later supports TLS 1.1 and TLS 1.2. Confirm the registry settings, but no additional changes are required. Make sure your NET Framework is up to date. 
+Why SSL/TLS Required to Configure:
+--To avoid Man in Middle men attacks
+ 
+
+How To Enable TLS in Windows [In this Demo I Showed for TLS 1.2]
+1.	Navigate to the following key: Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\.
+2.	In the right pane, right-click and select "New" > "Key".
+3.	Name the new key TLS 1.2 and click on it.
+4.	Right-click on the TLS 1.2 key, select "New" > "Key" again, and name this new key Client.
+5.	Within the Client key, right-click and choose "New" > "DWORD (32-bit) Value".
+6.	Name this new DWORD value DisabledByDefault.
+7.	Double-click DisabledByDefault to open its properties, set the base to hexadecimal, and ensure the value is set to 0.
+8.	Create another new DWORD value named Enabled.
+9.	Double-click Enabled to open its properties, set the base to hexadecimal, and ensure the value is set to 1.
+10.	Repeat the above steps for creating a Server key with the same DWORD values and their respective settings.
+11.	Close the Registry Editor.
+12.	Restart the system to apply the changes.
+
+How To Configure MS SQL SERVER With SSL\TLS:
+1.Purchase a certificate or create a certificate using PowerShell.
+2. Attach certificate to SQL Server instance & Enable force encryption option.
+3.Export & Import the Certificate to Trusted Directory.
+4.Verify the connections is encrypted or not.
+
+
+
+
+EXEC sp_readerrorlog 0, 1, 'cert';
+Go
+SELECT DISTINCT encrypt_option FROM sys.dm_exec_connections WHERE session_id = @@SPID
+
+New-SelfSignedCertificate -CertStoreLocation Cert:\LocalMachine\My -FriendlyName "SQL Server Certificate" -DnsName Lenovo
+
+Invoke-Sqlcmd -ServerInstance "lenovo" -Query "SELECT DISTINCT encrypt_option FROM sys.dm_exec_connections WHERE session_id = @@SPID"
+
+Errors I Faced during this test:
+
+Unable to find the user-specified certificate [Cert Hash(sha1) "C37641044B38D67011AEF5AC9521C0CDAD72C313"] in the certificate store of the local computer. Please verify that certificate exists.
+TDSSNIClient initialization failed with error 0x80092004, status code 0x80. Reason: Unable to initialize SSL support. Cannot find object or property. 
+
+Could not start the network library because of an internal error in the network library. To determine the cause, review the errors immediately preceding this one in the error log.
+
+A connection was successfully established with the server, but then an error occurred during the login process. (provider: SSL Provider, error: 0 - The certificate chain was issued by an authority that is not trusted.)
+
+Target principal name is incorrect:
+
+Reference links:
+https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate?view=windowsserver2022-ps
+
+https://learn.microsoft.com/en-us/troubleshoot/sql/database-engine/connect/tls-1-2-support-microsoft-sql-server
+
+https://blog.coeo.com/securing-connections-to-sql-server-with-tls
+

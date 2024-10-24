@@ -1,0 +1,14 @@
+DECLARE @ErrorLogTable TABLE (
+    LogDate DATETIME,
+    ProcessInfo NVARCHAR(50),
+    Text NVARCHAR(MAX)
+);
+
+-- Insert the error log contents into a table variable
+INSERT INTO @ErrorLogTable
+EXEC sp_readerrorlog 0, 1, 'Login'
+
+-- Select the latest login datetime
+SELECT LogDate AS LastLoginDateTime,
+ProcessInfo,[Text] FROM @ErrorLogTable
+ORDER BY LogDate DESC;

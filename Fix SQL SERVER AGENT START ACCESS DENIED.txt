@@ -1,0 +1,17 @@
+See the logs for the exact issue:
+
+1.Provide the permission on the sql server agent folder.
+2.Add the sql server agent service account as login with sysadmin. Keep this as a Optional
+3.Execute the below commands
+USE master;
+GO
+EXEC sp_configure 'show advanced option', '1'; --Enable advanced options
+RECONFIGURE;
+
+EXEC SP_CONFIGURE 'Agent XPs', 1;
+GO
+RECONFIGURE;
+GO
+4.start the agent if it is not restarting talk to client for downtime and restart the sql server and start the agent manually using services.msc if not started.
+
+Please do comment if any steps helped you in your real time.

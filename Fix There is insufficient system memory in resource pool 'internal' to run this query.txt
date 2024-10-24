@@ -1,0 +1,29 @@
+C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Binn>.\sqlservr.exe -f
+2024-05-16 17:55:52.51 Server      Multiple instances of SQL server are installed on this computer. Renter the command, specifying the -s parameter with the name of the instance that you want to start.
+SQL Server shutdown has been initiated.
+
+C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Binn>.\sqlservr.exe -m
+2024-05-16 17:56:04.38 Server      Multiple instances of SQL server are installed on this computer. Renter the command, specifying the -s parameter with the name of the instance that you want to start.
+SQL Server shutdown has been initiated.
+
+C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Binn>net start mssqlserver
+The SQL Server (MSSQLSERVER) service is starting...
+The SQL Server (MSSQLSERVER) service could not be started.
+
+A system error has occurred.
+
+System error 17190 has occurred.
+
+The system cannot find message text for message number 0x4326 in the message file for BASE.
+
+
+C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Binn>sqlcmd -Slenovo
+Sqlcmd: Error: Microsoft ODBC Driver 17 for SQL Server : Named Pipes Provider: Could not open a connection to SQL Server [2]. .
+Sqlcmd: Error: Microsoft ODBC Driver 17 for SQL Server : Login timeout expired.
+Sqlcmd: Error: Microsoft ODBC Driver 17 for SQL Server : A network-related or instance-specific error has occurred while establishing a connection to SQL Server. Server is not found or not accessible. Check if instance name is correct and if SQL Server is configured to allow remote connections. For more information see SQL Server Books Online..
+
+C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Binn>sqlcmd
+Sqlcmd: Error: Microsoft ODBC Driver 17 for SQL Server : Login failed for user 'LENOVO\Lenovo'. Reason: Server is in single user mode. Only one administrator can connect at this time..
+
+C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Binn>sqlcmd
+Sqlcmd: Error: Microsoft ODBC Driver 17 for SQL Server : Login failed for user 'LENOVO\Lenovo'. Reason: Server is in single user mode. Only one administrator can connect at this time..

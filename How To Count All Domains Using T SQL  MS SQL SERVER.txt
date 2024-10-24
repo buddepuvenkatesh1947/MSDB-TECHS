@@ -1,0 +1,6 @@
+
+
+SQL Query:
+  select Domains,count(*) from 
+  (select [EmailID], substring(emailid,charindex('@',[EmailID])+1, Len(emailID)) as Domains from test) emails
+  group by domains

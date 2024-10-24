@@ -1,0 +1,7 @@
+DECLARE @subject VARCHAR(max)
+SET @subject ='SQL Server lenovo Instance Restarted On '+ +CONVERT(VARCHAR(12),GETDATE(),107)
+
+Exec msdb.dbo.sp_send_dbmail
+@profile_name = 'giveyourdbmailprofiename',
+@recipients ='Yourownemailid@gmail.com',
+@body=@subject

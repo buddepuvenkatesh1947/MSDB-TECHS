@@ -1,0 +1,53 @@
+Create database Test
+GO
+---------------
+ALTER DATABASE Test ADD FILEGROUP SecondaryFileGroup;
+-------------------------
+
+ALTER DATABASE Test ADD FILE (
+    NAME = Testdata2,
+    FILENAME = 'C:\Data.ndf',
+    SIZE = 10MB, -- Set an appropriate size for your file
+    MAXSIZE = UNLIMITED, -- Or specify a maximum size
+    FILEGROWTH = 10MB -- Set an appropriate growth value
+) TO FILEGROUP SecondaryFileGroup;
+
+
+
+USE Test;
+CREATE TABLE PrimaryTable ( id int,name varchar(10)
+)
+
+insert into PrimaryTable values(1,'harsha')
+
+USE Test;
+CREATE TABLE SecondaryTable ( id int,name varchar(10)
+) on secondaryfilegroup
+
+insert into SecondaryTable values(2,'Srinu')
+
+-------------------------
+SELECT 
+    t.name AS TableName,
+    f.name AS FilegroupName
+FROM 
+    sys.tables t
+INNER JOIN 
+    sys.indexes i ON t.object_id = i.object_id
+INNER JOIN 
+    sys.filegroups f ON i.data_space_id = f.data_space_id
+ORDER BY 
+    TableName;
+
+ ------------------------------
+CREATE DATABASE  testsnap1 ON 
+(NAME= Test, FILENAME = 'D:\Program Files\Microsoft SQL Server\MSSQL16.SQLMARCH\MSSQL\SNAPSHOT\Test20230511.SS')
+,(NAME= Testdata2, FILENAME = 'D:\Testdata220230511.SS')
+AS SNAPSHOT OF test;
+-----------------------
+CREATE DATABASE Testsnap2
+ON
+(NAME = Test, FILENAME ='C:\Data\Test.mdf'),
+(NAME = Testdata2, FILENAME ='C:\Data\data.ndf')
+AS SNAPSHOT OF test
+GO

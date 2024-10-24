@@ -1,0 +1,3 @@
+1.Press the Windows key + R to bring up the Run box. Type regedit and press Enter.
+
+2.Navigate to the registry location: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SQL Server\Your_Instance_Name\MSSQLServer

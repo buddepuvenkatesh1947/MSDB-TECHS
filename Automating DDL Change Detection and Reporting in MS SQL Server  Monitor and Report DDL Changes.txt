@@ -1,0 +1,208 @@
+Automating DDL Change Detection and Reporting in MS SQL Server  Monitor and Report DDL Changes
+================================================
+
+Use AdventureWorks2019
+Go
+CREATE TABLE TableStructureSnapshot (
+    TableName VARCHAR(255),
+    ColumnName VARCHAR(255),
+    DataType VARCHAR(255),
+	CHARACTER_MAXIMUM_LENGTH VARCHAR(max),
+    IsNullable VARCHAR(3),
+    TableType VARCHAR(50),
+    Insertedate DATETIME DEFAULT GETDATE(),
+    PRIMARY KEY (TableName, ColumnName)
+);
+
+INSERT INTO TableStructureSnapshot (TableName, ColumnName, DataType,CHARACTER_MAXIMUM_LENGTH, IsNullable, TableType)
+SELECT 
+    c.table_name, 
+    c.column_name, 
+    c.data_type, 
+	C.CHARACTER_MAXIMUM_LENGTH,
+    c.is_nullable,
+    t.table_type
+FROM 
+    information_schema.columns c
+JOIN 
+    information_schema.tables t
+ON 
+    c.table_name = t.table_name
+
+
+	--select * from TableStructureSnapshot where tablename = 'errorlog'
+	--drop table  TableStructureSnapshot
+	--Truncate table  TableStructureSnapshot
+
+	--Made Changes
+	Create table testing (id int)
+	Go
+	Create table Testing1 (id int)
+	Go
+	Alter table testing Add  names varchar(10)
+	Go
+	Alter Table errorlog add rollno varchar(10) 
+	Go
+ALTER TABLE errorlog
+ALTER COLUMN ErrorProcedure VARCHAR(100);
+
+
+
+
+
+
+	--new table created
+	SELECT 
+    Currents.TableName
+FROM 
+    (SELECT table_name AS TableName
+     FROM information_schema.tables
+     WHERE table_type = 'BASE TABLE') AS Currents
+LEFT JOIN 
+    TableStructureSnapshot AS Snapshots
+ON 
+    Currents.TableName = Snapshots.TableName
+WHERE 
+    Snapshots.TableName IS NULL;
+
+
+-- Old Table Deleted:
+SELECT 
+    Distinct(Snapshots.TableName)
+FROM 
+    TableStructureSnapshot AS Snapshots
+LEFT JOIN 
+    information_schema.tables AS Currents
+ON 
+    Snapshots.TableName = Currents.table_name
+WHERE 
+    Currents.table_name IS NULL;
+
+-------------------------------------------
+--New Coulumns Detected..
+IF OBJECT_ID('tempdb..#ComparisonResults') IS NOT NULL
+    DROP TABLE #ComparisonResults;
+
+-- Create the temporary table
+CREATE TABLE #ComparisonResults (
+    TableName VARCHAR(255),
+    ColumnName VARCHAR(255),
+    DataType VARCHAR(255),
+    IsNullable VARCHAR(3)
+);
+
+-- Insert the comparison results into the temporary table
+INSERT INTO #ComparisonResults (TableName, ColumnName, DataType, IsNullable)
+SELECT 
+    curr.TableName, 
+    curr.ColumnName, 
+    curr.DataType, 
+    curr.IsNullable
+FROM 
+    (SELECT table_name AS TableName, column_name AS ColumnName, data_type AS DataType, is_nullable AS IsNullable
+     FROM information_schema.columns) AS curr
+FULL OUTER JOIN 
+    TableStructureSnapshot AS snap
+ON 
+    curr.TableName = snap.TableName 
+    AND curr.ColumnName = snap.ColumnName
+WHERE 
+    curr.TableName IS  NULL 
+    OR snap.TableName IS  NULL 
+    OR curr.ColumnName IS  NULL 
+    OR snap.ColumnName IS  NULL 
+    OR curr.DataType <> snap.DataType 
+    OR curr.IsNullable <> snap.IsNullable;
+
+-- Select from the temporary table to view the results
+SELECT * FROM #ComparisonResults where TableName is not null
+
+-- Optionally, drop the temporary table when done
+DROP TABLE #ComparisonResults;
+
+
+
+-- Columns Deleted Deteted.
+SELECT 
+    TableName,
+    ColumnName,
+    'Columns deleted or Renamed' AS Status
+FROM 
+    TableStructureSnapshot tss
+WHERE 
+    NOT EXISTS (
+        SELECT *
+        FROM information_schema.columns ic
+        WHERE tss.TableName = ic.TABLE_NAME
+          AND tss.ColumnName = ic.COLUMN_NAME
+    )
+    AND EXISTS (
+        SELECT *
+        FROM information_schema.tables it
+        WHERE it.TABLE_NAME = tss.TableName
+    );
+
+	----New Coulmns added
+	SELECT 
+    ic.TABLE_NAME AS TableName,
+    ic.COLUMN_NAME AS ColumnName,
+    'New Columns Added' AS Status
+FROM 
+    information_schema.columns ic
+WHERE 
+    EXISTS (
+        SELECT 1
+        FROM TableStructureSnapshot tss
+        WHERE tss.TableName = ic.TABLE_NAME
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM TableStructureSnapshot tss
+        WHERE tss.TableName = ic.TABLE_NAME
+          AND tss.ColumnName = ic.COLUMN_NAME
+    );
+
+	---Detect datatype change
+SELECT 
+    tss.TableName,
+    tss.ColumnName,
+    tss.DataType AS OldDataType,
+    ic.DATA_TYPE AS NewDataType
+FROM 
+    TableStructureSnapshot tss
+JOIN 
+    information_schema.columns ic
+ON 
+    tss.TableName = ic.TABLE_NAME
+    AND tss.ColumnName = ic.COLUMN_NAME
+JOIN
+    information_schema.tables it
+ON
+    it.TABLE_NAME = tss.TableName
+WHERE 
+    tss.DataType <> ic.DATA_TYPE
+    AND it.TABLE_TYPE = 'BASE TABLE';
+
+
+	---------------
+
+	---Detect datatype size change
+SELECT 
+    tss.TableName,
+    tss.ColumnName,
+    tss.CHARACTER_MAXIMUM_LENGTH AS OldMaxLength,
+    ic.CHARACTER_MAXIMUM_LENGTH AS NewMaxLength
+FROM 
+    TableStructureSnapshot tss
+JOIN 
+    information_schema.columns ic
+ON 
+    tss.TableName = ic.TABLE_NAME
+    AND tss.ColumnName = ic.COLUMN_NAME
+JOIN
+    information_schema.tables it
+ON
+    it.TABLE_NAME = tss.TableName
+WHERE 
+    tss.CHARACTER_MAXIMUM_LENGTH <> ic.CHARACTER_MAXIMUM_LENGTH
+    AND it.TABLE_TYPE = 'BASE TABLE';

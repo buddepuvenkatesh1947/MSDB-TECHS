@@ -1,0 +1,18 @@
+Add these two as shown in the video and restart the Computer.
+=================
+%SystemRoot%\SysWOW64\
+%SystemRoot%\SysWOW64\1033
+==============
+Error:
+===============================
+An unspecified error had occurred in the native SQL Server connection component.
+Stack:    at Microsoft.SqlServer.Replication.Snapshot.SqlServer.NativeBcpOutProvider.ThrowNativeBcpOutException(CConnection* pNativeConnectionWrapper)
+   at Microsoft.SqlServer.Replication.Snapshot.SqlServer.NativeBcpOutProvider.ThrowConnectionFailureException(CConnection* pNativeConnectionWrapper)
+   at Microsoft.SqlServer.Replication.Snapshot.SqlServer.NativeBcpOutProvider.InitializeNativeBcpOutProvider(LogMessageCallback logMessageCallback, String strName, String strApplication, String strHost, String strServer, String strNetwork, Int32 encryptionLevel, String strDatabase, SecurityMode securityMode, String strLogin, SecureString strPassword, Int32 bcpBatchSize, Int32 loginTimeout, Int32 queryTimeout, Int32 packetSize, DeadlockPriority deadlockPriority, String strRowDelimiter, String strFieldDelimiter, Byte syncMethod, Boolean forceOdbcBcp, Boolean forceOleDbBcp, Boolean enableMultipleActiveResultSets, Boolean useReadPastHint, Boolean usePageLockHint, Boolean securePassword)
+   at Microsoft.SqlServer.Replication.Snapshot.TransSnapshotProvider.InstantiateBcpOutProviderWorker(String strBcpConnectionName)
+   at Microsoft.SqlServer.Replication.Snapshot.SqlServerSnapshotProvider.InstantiateBcpOutProvider(String strBcpConnectionName)
+   at Microsoft.SqlServer.Replication.Snapshot.SqlServer.BcpOutThreadProvider.Initialize()
+   at Microsoft.SqlServer.Replication.WorkerThread.NonExceptionBasedAgentThreadProc()
+   at Microsoft.SqlServer.Replication.MainWorkerThread.AgentThreadProc()
+   at Microsoft.SqlServer.Replication.AgentCore.BaseAgentThread.AgentThreadProcWrapper() (Source: MSSQL_REPL, Error number: MSSQL_REPL55012)
+=====================

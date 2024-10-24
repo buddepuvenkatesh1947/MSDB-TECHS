@@ -1,0 +1,3 @@
+SQL Server 2019 Configuration File
+[OPTIONS]
+PID="yourserialkey"

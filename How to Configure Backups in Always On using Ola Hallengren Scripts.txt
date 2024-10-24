@@ -1,0 +1,4 @@
+How to Configure Backups in Always On using Ola Hallengren Scripts
+
+
+https://www.sqlshack.com/sql-server-always-on-availability-group-log-backup-on-secondary-replicas/

@@ -1,0 +1,32 @@
+# Step 1: Capture the state of services before patching
+$beforePatch = Get-Service | Select-Object Name, Status
+$beforePatch | Export-Csv -Path "C:\Path\To\beforePatch.csv" -NoTypeInformation
+
+# (Patching happens here)
+
+# Step 3: Capture the state of services after patching
+$afterPatch = Get-Service | Select-Object Name, Status
+$afterPatch | Export-Csv -Path "C:\Path\To\afterPatch.csv" -NoTypeInformation
+
+# Step 4: Compare the before and after states of services
+$beforePatch = Import-Csv -Path "C:\Path\To\beforePatch.csv"
+$afterPatch = Import-Csv -Path "C:\Path\To\afterPatch.csv"
+
+# Array to hold the comparison results
+$comparisonResults = @()
+
+foreach ($beforeService in $beforePatch) {
+    $afterService = $afterPatch | Where-Object { $_.Name -eq $beforeService.Name }
+    if ($afterService -and $beforeService.Status -ne $afterService.Status) {
+        $result = [PSCustomObject]@{
+            Name        = $beforeService.Name
+            BeforeStatus = $beforeService.Status
+            AfterStatus  = $afterService.Status
+        }
+        $comparisonResults += $result
+        Write-Host "Service '$($beforeService.Name)' status changed from '$($beforeService.Status)' to '$($afterService.Status)'"
+    }
+}
+
+# Step 5: Export comparison results to a new Excel file
+$comparisonResults | Export-Excel -Path "C:\Path\To\compare.xlsx"

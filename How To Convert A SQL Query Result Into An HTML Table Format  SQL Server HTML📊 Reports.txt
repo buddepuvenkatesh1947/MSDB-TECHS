@@ -1,0 +1,33 @@
+DECLARE @HTMLtable NVARCHAR(MAX);
+
+
+SET @HTMLtable = 
+N'<H5 style="color: #3dab15; font-family: Arial, Verdana">Database Health Status</H5>' +
+N'<table border="3" style="font-family: Arial, Verdana; text-align:left; font-size:9pt; color: #000033">' +
+N'<tr style="text-align: left;">
+<th style="text-align:left;background-color: #FFA500; color:#FFF; font-weight: bold; width: 25%;">NAME</th> 
+<th style="text-align:left;background-color: #FFA500; color:#FFF; font-weight: bold; width: 25%;">compatibility_level</th>
+<th style="text-align:left;background-color: #FFA500; color:#FFF; font-weight: bold; width: 25%;">database_id</th>
+<th style="text-align: left;background-color: #FFA500; color: #FFF; font-weight: bold; width: 25%;">state_desc</th>'
+
++
+CAST(( SELECT
+td = Name,'',
+td =  compatibility_level,'',
+td =  database_id,'',
+td = state_desc
+FROM sys.databases
+FOR XML PATH('tr'), TYPE
+) AS NVARCHAR(MAX) ) + 
+N'</table>'
+
+SELECT @HTMLtable as HTMLTEXT;
+
+
+
+EXEC msdb.dbo.sp_send_dbmail 
+	@profile_name = 'outlook'
+	, @recipients = 'XXXXX@gmail.com'
+	, @body = @HTMLtable
+    , @body_format = 'HTML'
+	, @subject = 'Database Health Report'

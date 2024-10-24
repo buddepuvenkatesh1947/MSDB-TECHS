@@ -1,0 +1,60 @@
+# Step 1: Get Server List
+$servers = Get-Content "C:\Test\serverlist.txt"
+
+# Step 2: Retrieve and Filter SQL Services
+$allServices = @()  # Initialize an array to store services from all servers
+
+foreach ($server in $servers) {
+    $services = Get-WmiObject win32_service -ComputerName $server | Select-Object SystemName, Name, State | Sort-Object State
+    
+    # Add the services to the array
+    $allServices += $services
+
+    # Display the services
+    $services | Format-Table -AutoSize
+}
+
+# Export all services to a CSV file for Before Patch state
+$allServices | Export-Csv -Path "C:\Path\To\beforePatch.csv" -NoTypeInformation
+
+# (Assuming patching happens here)
+
+# Step 3: Retrieve and Filter SQL Services after patching
+$allServicesAfterPatch = @()  # Initialize an array to store services from all servers
+
+foreach ($server in $servers) {
+    $servicesAfter = Get-WmiObject win32_service -ComputerName $server | Select-Object SystemName, Name, State | Sort-Object State
+    
+    # Add the services to the array
+    $allServicesAfterPatch += $servicesAfter
+
+    # Display the services
+    $servicesAfter | Format-Table -AutoSize
+}
+
+# Export all services to a CSV file for After Patch state
+$allServicesAfterPatch | Export-Csv -Path "C:\Path\To\afterPatch.csv" -NoTypeInformation
+
+# Step 4: Compare the before and after states of services
+$beforePatch = Import-Csv -Path "C:\Path\To\beforePatch.csv"
+$afterPatch = Import-Csv -Path "C:\Path\To\afterPatch.csv"
+
+# Array to hold the comparison results
+$comparisonResults = @()
+
+foreach ($beforeService in $beforePatch) {
+    $afterService = $afterPatch | Where-Object { $_.Name -eq $beforeService.Name -and $_.SystemName -eq $beforeService.SystemName }
+    if ($afterService -and $beforeService.State -ne $afterService.State) {
+        $result = [PSCustomObject]@{
+            SystemName   = $beforeService.SystemName
+            Name         = $beforeService.Name
+            BeforeStatus = $beforeService.State
+            AfterStatus  = $afterService.State
+        }
+        $comparisonResults += $result
+        Write-Host "Service '$($beforeService.Name)' on server '$($beforeService.SystemName)' status changed from '$($beforeService.State)' to '$($afterService.State)'"
+    }
+}
+
+# Step 5: Export comparison results to a new CSV file
+$comparisonResults | Export-Csv -Path "C:\Path\To\compare.csv" -NoTypeInformation

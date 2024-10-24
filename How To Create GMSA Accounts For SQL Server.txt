@@ -1,0 +1,24 @@
+ON Active Directory:Ingore u get any error for below command.
+Test-KdsRootKey -KeyId (Get-KdsRootKey).KeyId
+
+ON Active Directory
+It need to wait 10 hours before creating gMSA
+Add-KdsRootKey -EffectiveImmediately
+#or
+It can create gMSA without waiting for 10 hours
+It does not recommend in production environment
+Add-KdsRootKey -EffectiveTime ((get-date).addhours(-10))
+
+ON Active Directory
+Get-KdsRootKey
+
+ON Active Directory
+New-ADServiceAccount -Name NodeTest4 -PrincipalsAllowedToRetrieveManagedPassword sqladmins -Enabled:$true -DNSHostName Nodetest4.forest.local -SamAccountName NodeTest4 -ManagedPasswordIntervalInDays 365
+
+
+
+=====================
+On Member Server.
+
+Install-ADServiceAccount -Identity NodeTest4
+Test-ADServiceAccount NodeTEsT4

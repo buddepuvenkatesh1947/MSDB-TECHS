@@ -1,0 +1,19 @@
+USE master
+GO
+EXEC sp_configure 'show advanced options', 1
+RECONFIGURE WITH OVERRIDE
+GO
+EXEC sp_configure 'max server memory (MB)'
+GO
+
+
+USE master 
+GO
+
+ALTER SERVER CONFIGURATION 
+SET BUFFER POOL EXTENSION ON
+    (FILENAME = 'D:\SQL2022.BPE', SIZE = 12 GB);
+GO
+
+select * from sys.dm_os_buffer_pool_extension_configuration
+

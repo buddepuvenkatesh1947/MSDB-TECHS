@@ -1,0 +1,16 @@
+
+--Step1:Create Server Role with Required Privileges
+CREATE SERVER ROLE Readonly
+GO
+GRANT CONNECT ANY DATABASE TO Readonly
+GO
+GRANT SELECT ALL USER SECURABLES TO Readonly
+GO
+--Step2:create login and add to the above role.
+
+USE [master]
+GO
+CREATE LOGIN [testuser] WITH PASSWORD=N'123'
+Go
+ALTER SERVER ROLE [Readonly] ADD MEMBER [testuser]
+GO

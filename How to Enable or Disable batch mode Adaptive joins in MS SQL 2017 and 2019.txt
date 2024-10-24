@@ -1,0 +1,10 @@
+--For MS SQL 2017
+--Turning on
+Alter Database scoped configuration 
+set disable_batch_mode_Adaptive_joins = off
+
+--For MS SQL 2019 onwords
+--Turning on
+Alter Database scoped configuration 
+set batch_mode_Adaptive_joins = on
+

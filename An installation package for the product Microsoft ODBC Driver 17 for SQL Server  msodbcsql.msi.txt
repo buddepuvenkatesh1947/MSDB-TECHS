@@ -1,0 +1,16 @@
+ERROR: An installation package for the product Microsoft ODBC Driver 17 for SQL Server cannot be found. Try the installation again using a valid copy of the installation package 'msodbcsql.msi'.
+
+Environment: One of my colleague, has asked me help to install SQL Server 2022 in his office laptop. She already installed 2022 Default instance which got expired. Since we don’t have key to install another instance instead of uninstalling of default instance and installing it again. She is having SSMS 19.2 version Installed.
+
+In Middle of installation, she got “An installation package for the product Microsoft ODBC Driver 17 for SQL Server cannot be found. Try the installation again using a valid copy of the installation package 'msodbcsql.msi”.
+We cancelled it and it got rolled back.
+So many doubts It comes to my mind. 
+Installing is running with NT accounts, that might be blocking or some permissions to odbc files. If it is blocking with some permissions with NT, how could it got installed previously.
+Is iso corrupted.
+Is Latest ssms getting trouble
+Is SQL server existing ODBC drivers causing issue.
+What about other versions like SQL Server 2019.
+
+We tried installing 2019 but encounter with the same. Finally, we decided that uninstalling might help since in the error it is showing the same thing.
+ 
+Resolution: Uninstalled ODBC Driver 17 and installed SQL 2022 and this time it installed successfully.

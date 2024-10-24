@@ -1,0 +1,78 @@
+$servers = Get-Content "C:\Test\serverlist.txt"
+$primaryReplicas = @("Node1", "Node3")  # Add the primary replicas you want to match here
+$results = @()
+
+foreach ($sqlinstance in $servers) {
+    Write-Host "Server: $sqlinstance"
+
+    $query = @"
+    SELECT ag.name AS Ag_name, ars.role_desc AS Replica_role, ar.replica_server_name AS Primary_replica, ars.connected_state_desc AS Connection_state, ar.failover_mode_desc AS Failover_mode, ars.synchronization_health_desc AS Synchronization_state, agl.dns_name AS Listener
+    FROM sys.availability_groups ag
+        INNER JOIN [master].[sys].[dm_hadr_availability_replica_states] ars ON ag.group_id = ars.group_id
+        INNER JOIN sys.availability_replicas ar ON ar.replica_id = ars.replica_id
+        INNER JOIN sys.availability_group_listeners AGL ON AGL.group_id = ars.group_id
+    WHERE CASE
+            WHEN ars.role_desc = 'PRIMARY' THEN 1
+            WHEN NOT EXISTS(SELECT 1 FROM [master].[sys].[dm_hadr_availability_replica_states] WHERE role_desc = 'PRIMARY') THEN 1
+        END = 1
+"@
+
+    try {
+        $result = Invoke-Sqlcmd -ServerInstance $sqlinstance -Query $query
+        $results += $result
+    } catch {
+        Write-Host "Failed to execute the SQL query on the server."
+        Write-Host "Error: $_"
+    }
+
+    Write-Host "--------------------------"
+}
+
+$results = $results | Select-Object *, @{
+    Name = "Preferred_replica"
+    Expression = { if ($_.replica_role -eq 'PRIMARY' -and $primaryReplicas -notcontains $_.primary_replica) { 'Not Matched' } else { 'Matched' } }
+}
+
+$tableStyle = @"
+<style>
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        border: 2px solid black;
+    }
+
+    th, td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 2px solid black;
+        border-right: 2px solid black;
+    }
+
+    th:last-child,
+    td:last-child {
+        border-right: none;
+    }
+
+    th {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .matched {
+        background-color: #c2e0c6;
+    }
+
+    .not-matched {
+        background-color: #f7c6c5;
+    }
+</style>
+"@
+
+$htmlContent = $results | ConvertTo-Html -Property ag_name, replica_role, primary_replica, connection_state, failover_mode, synchronization_state, listener, "Preferred_replica" -As Table |
+    ForEach-Object { $_ -replace '<table>', '<table id="myTable">' }
+
+#$htmlContent = $htmlContent -replace '<tr>', '<tr class="matched">' -replace 'Preferred_replica">Matched', 'Preferred_replica" class="preferred-match">Not Matched' -replace 'class="matched">', 'class="not-matched">'
+
+$htmlContent = $tableStyle + $htmlContent
+
+$htmlContent | Out-File "C:\Test\output.html"

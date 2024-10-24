@@ -1,0 +1,55 @@
+--ERROR
+--Msg 3906, Level 16, State 1, Line 3
+--Failed to update database "msdb" because the database is read-only.
+--Msg 3009, Level 16, State 1, Line 3
+--Could not insert a backup or restore history/detail record in the msdb database.
+--This may indicate a problem with the msdb database. 
+--The backup/restore operation was still successful.
+
+--To Simulate the issue i am setting the MSDDB database to Read only mode...
+USE [master]
+GO
+ALTER DATABASE [msdb] SET READ_ONLY WITH ROLLBACK IMMEDIATE 
+GO
+
+--Take to Take back up of any database
+BACKUP DATABASE DBA TO DISK = 'C:\DBA_Full.bak'
+
+--Possible Reasons
+--Backups are happening but Only logging is not happening into MSDB history tables 
+--corruption in the database one of the reason... DBCC CheckDB will be helpfull
+--Antivirus scanning the MDF file and thats the reason the sql server is not having permission of that drive.
+--Permissions was removed on the msdb data file drive...
+--insufficient memory or disk space
+--Check error log for futher inputs...
+--Exclusive Locks on MSDB Tables...
+-->Rebuilding MSDB is the last option......
+
+--Workaround\Solution:If you are ok with logging is not required then u can use
+--below DBCC commands
+DBCC TRACEON(3001,-1)
+BACKUP DATABASE DBA TO DISK = 'C:\DBA_Full.bak'
+
+--Clean UP The lab
+
+
+USE [master]
+GO
+ALTER DATABASE [msdb] SET READ_WRITE WITH ROLLBACK IMMEDIATE 
+GO
+
+---Second Demo:
+--Disable the DBCC Trace off
+DBCC TRACEOff(3001,-1)
+
+--This will take exclusive lock
+begin tran
+update [msdb].[dbo].[restorehistory] with (tablock)
+set replace = 1
+Rollback
+--Restore any database --this will get blocked and cancel the query and you will get an error
+--that Could not insert a backup or restore history/detail
+RESTORE DATABASE TestDB_RestoredE
+FROM DISK = 'C:\TestDB.bak'
+WITH MOVE 'TestDB' TO 'C:\TestDB_RE.mdf',
+MOVE 'TestDB_log' TO 'C:\TestDB_RE.ldf';
