@@ -1,0 +1,54 @@
+-- Transact-SQL script to analyse the database size growth using backup history. 
+DECLARE @endDate datetime, @months smallint; 
+SET @endDate = GetDate();  -- Include in the statistic all backups from today 
+SET @months = 6;           -- back to the last 6 months. 
+;WITH HIST AS 
+   (SELECT BS.database_name AS DatabaseName 
+          ,YEAR(BS.backup_start_date) * 100 
+           + MONTH(BS.backup_start_date) AS YearMonth 
+          ,CONVERT(numeric(10, 1), MIN(BF.file_size / 1048576.0)) AS MinSizeMB 
+          ,CONVERT(numeric(10, 1), MAX(BF.file_size / 1048576.0)) AS MaxSizeMB 
+          ,CONVERT(numeric(10, 1), AVG(BF.file_size / 1048576.0)) AS AvgSizeMB 
+    FROM msdb.dbo.backupset as BS 
+         INNER JOIN 
+         msdb.dbo.backupfile AS BF 
+             ON BS.backup_set_id = BF.backup_set_id 
+    WHERE NOT BS.database_name IN 
+              ('master', 'msdb', 'model', 'tempdb') 
+          AND BF.file_type = 'D' 
+          AND BS.backup_start_date BETWEEN DATEADD(mm, - @months, @endDate) AND @endDate 
+    GROUP BY BS.database_name 
+            ,YEAR(BS.backup_start_date) 
+            ,MONTH(BS.backup_start_date)) 
+SELECT MAIN.DatabaseName 
+      ,MAIN.YearMonth 
+      ,MAIN.MinSizeMB 
+      ,MAIN.MaxSizeMB 
+      ,MAIN.AvgSizeMB 
+      ,MAIN.AvgSizeMB  
+       - (SELECT TOP 1 SUB.AvgSizeMB 
+          FROM HIST AS SUB 
+          WHERE SUB.DatabaseName = MAIN.DatabaseName 
+                AND SUB.YearMonth < MAIN.YearMonth 
+          ORDER BY SUB.YearMonth DESC) AS GrowthMB 
+FROM HIST AS MAIN 
+ORDER BY MAIN.DatabaseName 
+        ,MAIN.YearMonth
+=================================
+SELECT
+S.[name] AS [Logical Name]
+,S.[file_id] AS [File ID]
+ 
+,CONVERT (varchar(10),(S.[size]*8)) + ' KB' AS [Size]
+,CASE WHEN S.[max_size]=-1 THEN 'Unlimited' ELSE CONVERT(VARCHAR(10),CONVERT(bigint,S.[max_size])*8) +' KB' END AS [Max Size]
+,CASE s.is_percent_growth WHEN 1 THEN CONVERT(VARCHAR(10),S.growth) +'%' ELSE Convert(VARCHAR(10),S.growth*8) +' KB' END AS [Growth]
+,Case WHEN S.[type]=0 THEN 'Data Only'
+WHEN S.[type]=1 THEN 'Log Only'
+WHEN S.[type]=2 THEN 'FILESTREAM Only'
+WHEN S.[type]=3 THEN 'Informational purposes Only'
+WHEN S.[type]=4 THEN 'Full-text '
+END AS [usage]
+,DB_name(S.database_id) AS [Database Name]
+FROM sys.master_files AS S
+LEFT JOIN sys.filegroups AS G ON ((S.type = 2 OR S.type = 0)
+AND (S.drop_lsn IS NULL)) AND (S.data_space_id=G.data_space_id)

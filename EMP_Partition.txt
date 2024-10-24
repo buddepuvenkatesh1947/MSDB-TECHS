@@ -1,0 +1,54 @@
+---Step-1: Create Test DB (Optional)
+Create database Test
+
+---Step:2 Create the FileGroups----
+ALTER DATABASE Hospital ADD FILEGROUP FileGroup1;
+GO
+ALTER DATABASE Hospital ADD FILEGROUP FileGroup2;
+---Step:3 Create the Files in the FileGroups----
+ALTER DATABASE Hospital ADD FILE (NAME=File1, FileName='D:\Partiton files\File1.ndf', SIZE=50MB, MAXSIZE = 100MB, FILEGROWTH = 20MB)
+To FILEGROUP FileGroup1;
+GO
+ALTER DATABASE Hospital ADD FILE (NAME=File2, FileName='D:\Partiton files\File2.ndf', SIZE=50MB, MAXSIZE = 100MB, FILEGROWTH = 20MB)
+To FILEGROUP FileGroup2;
+
+---Parition---
+---STEP:1 CREATING THE PARTITION FUNCTION-----
+CREATE PARTITION FUNCTION EMPPartitionFunction (INT) AS RANGE LEFT FOR VALUES (10);
+
+---Step:4 Create the Partition Scheme-----
+CREATE PARTITION SCHEME EmployeesScheme AS PARTITION EMPPartitionFunction To (FileGroup1, FileGroup2)
+
+---Step:5 Create the table with Partitioning-----
+CREATE TABLE dbo.Employee_partiton
+(
+    EmployeeID_New int ,
+    FirstName_New varchar(50), 
+    Position_New varchar(50) 
+    
+    CONSTRAINT PK_ PRIMARY KEY (EmployeeID_New)
+)
+ON EmployeesScheme (EmployeeID_New);
+
+
+---Step:6 Insert data Into the Dummy table to copy the data into partiontion table---
+Select EmployeeId, FirstName, Position into Employees1 from Employees;
+
+---Copy data from dummy table data into partiotion table then drop dummy table---
+INSERT INTO dbo.Employee_partiton (EmployeeID_New, FirstName_New, Position_New)
+SELECT EmployeeId, FirstName, Position
+FROM Employees1;
+----Drop Dummy table---
+Drop table Employees1;
+
+----To check Whether Partition has done----
+SELECT PARTITION_ID,
+OBJECT_NAME(OBJECT_ID) AS TABLENAME,
+PARTITION_NUMBER,
+ROW_COUNT 
+FROM SYS.DM_DB_PARTITION_STATS
+WHERE OBJECT_ID=OBJECT_ID('dbo.Employee_partiton');
+
+select * from dbo.Employee_partiton;
+
+Select * from Employees

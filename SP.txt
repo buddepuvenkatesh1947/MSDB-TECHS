@@ -1,0 +1,46 @@
+USE [DB]
+GO
+/****** Object:  StoredProcedure [dbo].[Activate_Users]    Script Date: 4/29/2024 3:15:08 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER proc [dbo].[Activate_Users]    @UserID INT
+as 
+begin
+DECLARE @Object AS INT;
+DECLARE @ResponseText AS VARCHAR(8000);
+
+DECLARE @url NVARCHAR(MAX);
+
+SET @url = 'http://me-south-1.elasticbeanstalk.com/api/ServerNotification/ActivateUsers?userID=' + CAST(@UserID AS NVARCHAR(10)); --Prod
+--SET @url = 'http://preprodapi.smartsortbackoffice.com/api/ServerNotification/ActivateUsers?userID=' + CAST(@UserID AS NVARCHAR(10)); --UAT
+
+declare @UserName varchar(50)
+--select top 1 @UserId=UserId,@UserName=UserName from Users order by UserID desc
+--Print @UserId
+--set @UserId=149
+--set @UserName='collector@gmail.com'
+DECLARE @Body AS VARCHAR(8000) ;
+--= 
+--'{
+--	"UserId":"'+CAST(@UserId as varchar)+'",
+--	"UserName":"'+CAST(@UserName as varchar)+'"
+--}'  
+
+
+EXEC sp_OACreate 'MSXML2.XMLHTTP', @Object OUT;
+--  Path off API application
+EXEC sp_OAMethod @Object, 'open', NULL, 'post',@url, 'false'
+
+
+EXEC sp_OAMethod @Object, 'setRequestHeader', null, 'Content-Type', 'application/json'
+EXEC sp_OAMethod @Object, 'send', null, @body
+
+EXEC sp_OAMethod @Object, 'responseText', @ResponseText OUTPUT
+SELECT @ResponseText
+
+EXEC sp_OADestroy @Object
+
+end
+
